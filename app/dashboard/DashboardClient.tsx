@@ -506,14 +506,6 @@ export default function DashboardClient({
     }
 
     const src = URL.createObjectURL(file);
-    let objectFit: AvatarCropState['objectFit'] = 'cover';
-    try {
-      const image = await loadImageFromUrl(src);
-      objectFit =
-        image.width >= image.height ? 'vertical-cover' : 'horizontal-cover';
-    } catch {
-      objectFit = 'cover';
-    }
 
     return new Promise<File | null>((resolve) => {
       avatarCropResolver.current = resolve;
@@ -522,7 +514,7 @@ export default function DashboardClient({
         src,
         fileName: file.name || 'avatar.jpg',
         mimeType: file.type || 'image/jpeg',
-        objectFit,
+        objectFit: 'cover',
         crop: { x: 0, y: 0 },
         zoom: 1,
         croppedAreaPixels: null,
@@ -579,14 +571,6 @@ export default function DashboardClient({
     }
 
     const src = URL.createObjectURL(file);
-    let objectFit: BackgroundCropState['objectFit'] = 'cover';
-    try {
-      const image = await loadImageFromUrl(src);
-      objectFit =
-        image.width >= image.height ? 'vertical-cover' : 'horizontal-cover';
-    } catch {
-      objectFit = 'cover';
-    }
 
     return new Promise<File | null>((resolve) => {
       backgroundCropResolver.current = resolve;
@@ -595,7 +579,7 @@ export default function DashboardClient({
         src,
         fileName: file.name || 'background.jpg',
         mimeType: file.type || 'image/jpeg',
-        objectFit,
+        objectFit: 'cover',
         crop: { x: 0, y: 0 },
         zoom: 1,
         croppedAreaPixels: null,
@@ -1183,3 +1167,6 @@ export default function DashboardClient({
     </div>
   );
 }
+
+
+

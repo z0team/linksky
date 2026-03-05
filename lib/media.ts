@@ -14,6 +14,38 @@ type ProcessedUpload = {
   fileName: string;
 };
 
+const AUDIO_EXTENSIONS = new Set([
+  '.aac',
+  '.flac',
+  '.m4a',
+  '.mp3',
+  '.oga',
+  '.ogg',
+  '.opus',
+  '.wav',
+  '.weba',
+  '.webm',
+]);
+
+const AUDIO_MIME_TYPES = new Set([
+  'audio/aac',
+  'audio/flac',
+  'audio/mp3',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/opus',
+  'audio/wav',
+  'audio/webm',
+  'audio/x-aac',
+  'audio/x-flac',
+  'audio/x-m4a',
+  'audio/x-wav',
+  'application/ogg',
+  'video/mp4',
+  'video/webm',
+]);
+
 const replaceExtension = (fileName: string, extension: string) => {
   const parsed = path.parse(fileName || 'file');
   return `${parsed.name || 'file'}${extension}`;
@@ -26,6 +58,15 @@ const detectMimeType = async (buffer: Buffer, fallbackMime: string, fileName: st
   const extension = path.extname(fileName).toLowerCase();
   if (extension === '.cur') return 'image/x-icon';
   return fallbackMime || 'application/octet-stream';
+};
+
+const isSupportedAudioUpload = (mimeType: string, fileName: string) => {
+  const normalizedMime = mimeType.trim().toLowerCase();
+  const extension = path.extname(fileName).toLowerCase();
+
+  if (normalizedMime.startsWith('audio/')) return true;
+  if (AUDIO_MIME_TYPES.has(normalizedMime)) return true;
+  return AUDIO_EXTENSIONS.has(extension);
 };
 
 const compressWebpToLimit = async (
@@ -139,7 +180,7 @@ export const processUpload = async (input: {
   const mimeType = await detectMimeType(input.buffer, input.fallbackMime, input.fileName);
 
   if (input.kind === 'audio') {
-    if (!mimeType.startsWith('audio/')) {
+    if (!isSupportedAudioUpload(mimeType, input.fileName)) {
       throw new Error('Unsupported audio file');
     }
 
@@ -156,3 +197,4 @@ export const processUpload = async (input: {
 
   return optimizeImageBuffer(input.buffer, input.fileName, input.kind);
 };
+

@@ -367,6 +367,12 @@ export function AvatarCropModal({
               cropShape="rect"
               showGrid={false}
               objectFit={objectFit}
+              style={{
+                mediaStyle: {
+                  maxWidth: 'unset',
+                  maxHeight: 'unset',
+                },
+              }}
               onCropChange={onCropChange}
               onCropComplete={onCropComplete}
               onZoomChange={onZoomChange}
@@ -464,6 +470,12 @@ export function BackgroundCropModal({
               cropShape="rect"
               showGrid
               objectFit={objectFit}
+              style={{
+                mediaStyle: {
+                  maxWidth: 'unset',
+                  maxHeight: 'unset',
+                },
+              }}
               onCropChange={onCropChange}
               onCropComplete={onCropComplete}
               onZoomChange={onZoomChange}
@@ -506,3 +518,4 @@ export function BackgroundCropModal({
     </div>
   );
 }
+
