@@ -205,7 +205,16 @@ export default function Landing() {
             transition={{ duration: 0.65 }}
             className="rounded-[24px] border border-white/15 bg-black/30 backdrop-blur-xl p-3 shadow-[0_20px_60px_rgba(0,0,0,0.38)]"
           >
-            <div className="rounded-[22px] overflow-hidden border border-white/10 bg-black">
+            <div className="md:hidden overflow-hidden rounded-[22px] border border-white/10 bg-black">
+              <iframe
+                src="/preview/test?embed=1"
+                className="h-[620px] w-full border-0"
+                loading="lazy"
+                title="LinkSky live preview"
+              />
+            </div>
+
+            <div className="hidden md:block rounded-[22px] overflow-hidden border border-white/10 bg-black">
               <div className="h-10 px-4 border-b border-white/10 bg-black/55 flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
                 <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />

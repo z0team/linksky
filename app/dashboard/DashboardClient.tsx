@@ -792,7 +792,7 @@ export default function DashboardClient({
       className="min-h-screen bg-[radial-gradient(circle_at_8%_-12%,rgba(112,130,255,0.2),transparent_36%),radial-gradient(circle_at_92%_5%,rgba(87,173,255,0.16),transparent_35%),linear-gradient(180deg,#0a111d_0%,#090f19_100%)] text-white lg:h-screen lg:overflow-hidden"
     >
       <div className="flex min-h-screen flex-col lg:h-screen lg:flex-row">
-        <aside className="w-full lg:w-72 lg:shrink-0 bg-[#0f1625]/92 backdrop-blur-2xl p-4 lg:h-screen lg:overflow-y-auto flex flex-col border-r border-white/5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05),0_30px_55px_rgba(0,0,0,0.42)]">
+        <aside className="w-full lg:w-72 lg:shrink-0 bg-[#0f1625]/92 backdrop-blur-2xl p-4 lg:h-screen lg:overflow-y-auto flex flex-col border-b lg:border-b-0 lg:border-r border-white/5 shadow-[0_16px_34px_rgba(0,0,0,0.22)] lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05),0_30px_55px_rgba(0,0,0,0.42)]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#6f88ff] via-[#8a76ff] to-[#b568ff] flex items-center justify-center shadow-[0_10px_24px_rgba(126,122,255,0.5)]">
               <Sparkles size={18} />
@@ -860,26 +860,26 @@ export default function DashboardClient({
                   {analytics.ctr}% CTR
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                 <a
                   href={profileUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
                 >
                   <ExternalLink size={15} />
                   Open
                 </a>
                 <button
                   onClick={handleCopy}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
                 >
                   <Copy size={15} />
                   {copied ? 'Copied' : 'Copy URL'}
                 </button>
                 <button
                   onClick={resetLook}
-                  className="inline-flex items-center gap-2 rounded-xl border border-red-500/45 bg-red-500/10 px-3.5 py-2 text-sm text-red-200 transition-all duration-200 hover:bg-red-500/16"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/45 bg-red-500/10 px-3.5 py-2 text-sm text-red-200 transition-all duration-200 hover:bg-red-500/16"
                 >
                   <RotateCcw size={15} />
                   Reset style
@@ -887,14 +887,14 @@ export default function DashboardClient({
                 <button
                   onClick={handleSave}
                   disabled={saveState === 'saving'}
-                  className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                   Save now
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#334155] bg-transparent px-3.5 py-2 text-sm text-neutral-200 transition-all duration-200 hover:bg-[#141c2b]"
+                  className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-transparent px-3.5 py-2 text-sm text-neutral-200 transition-all duration-200 hover:bg-[#141c2b]"
                 >
                   <LogOut size={15} />
                   Logout
@@ -1167,6 +1167,7 @@ export default function DashboardClient({
     </div>
   );
 }
+
 
 
 
