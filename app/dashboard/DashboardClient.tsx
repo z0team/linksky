@@ -173,6 +173,39 @@ const replaceExt = (name: string, ext: string) => {
   return name.replace(/\.[^/.]+$/, '') + ext;
 };
 
+const getCenteredAspectCrop = (croppedAreaPixels: Area, aspect: number) => {
+  const width = Math.max(1, croppedAreaPixels.width);
+  const height = Math.max(1, croppedAreaPixels.height);
+  const currentAspect = width / height;
+
+  if (Math.abs(currentAspect - aspect) < 0.001) {
+    return {
+      x: croppedAreaPixels.x,
+      y: croppedAreaPixels.y,
+      width,
+      height,
+    };
+  }
+
+  if (currentAspect > aspect) {
+    const targetWidth = Math.max(1, Math.round(height * aspect));
+    return {
+      x: croppedAreaPixels.x + Math.round((width - targetWidth) / 2),
+      y: croppedAreaPixels.y,
+      width: targetWidth,
+      height,
+    };
+  }
+
+  const targetHeight = Math.max(1, Math.round(width / aspect));
+  return {
+    x: croppedAreaPixels.x,
+    y: croppedAreaPixels.y + Math.round((height - targetHeight) / 2),
+    width,
+    height: targetHeight,
+  };
+};
+
 const resizeImageFileToMaxSide = async (
   file: File,
   maxSide: number,
@@ -216,6 +249,7 @@ const createAvatarCropFile = async (
   mimeType: string,
 ) => {
   const image = await loadImageFromUrl(sourceUrl);
+  const sourceCrop = getCenteredAspectCrop(croppedAreaPixels, 1);
   const canvas = document.createElement('canvas');
   canvas.width = AVATAR_TARGET_SIZE;
   canvas.height = AVATAR_TARGET_SIZE;
@@ -226,10 +260,10 @@ const createAvatarCropFile = async (
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(
     image,
-    croppedAreaPixels.x,
-    croppedAreaPixels.y,
-    croppedAreaPixels.width,
-    croppedAreaPixels.height,
+    sourceCrop.x,
+    sourceCrop.y,
+    sourceCrop.width,
+    sourceCrop.height,
     0,
     0,
     AVATAR_TARGET_SIZE,
@@ -252,6 +286,7 @@ const createBackgroundCropFile = async (
   mimeType: string,
 ) => {
   const image = await loadImageFromUrl(sourceUrl);
+  const sourceCrop = getCenteredAspectCrop(croppedAreaPixels, 16 / 9);
   const canvas = document.createElement('canvas');
   canvas.width = BACKGROUND_TARGET_WIDTH;
   canvas.height = BACKGROUND_TARGET_HEIGHT;
@@ -262,10 +297,10 @@ const createBackgroundCropFile = async (
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(
     image,
-    croppedAreaPixels.x,
-    croppedAreaPixels.y,
-    croppedAreaPixels.width,
-    croppedAreaPixels.height,
+    sourceCrop.x,
+    sourceCrop.y,
+    sourceCrop.width,
+    sourceCrop.height,
     0,
     0,
     BACKGROUND_TARGET_WIDTH,
