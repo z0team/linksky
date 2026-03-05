@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  username     String             @id
+  email        String             @unique
+  passwordHash String             @map("password_hash")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  profile      Profile?
+  sessions     Session[]
+  viewEvents   ProfileViewEvent[]
+  clickEvents  SocialClickEvent[]
+
+  @@map("users")
+}
+
+model Profile {
+  username      String  @id
+  displayName   String  @map("display_name")
+  bio           String
+  status        String
+  location      String
+  avatarUrl     String  @map("avatar_url")
+  backgroundUrl String  @map("background_url")
+  musicUrl      String  @map("music_url")
+  cursorUrl     String  @map("cursor_url")
+  songTitle     String  @map("song_title")
+  enterText     String  @map("enter_text")
+  accentColor   String  @map("accent_color")
+  cardOpacity   Float   @map("card_opacity")
+  blurStrength  Float   @map("blur_strength")
+  showViews     Boolean @map("show_views")
+  enableGlow    Boolean @map("enable_glow")
+  fontFamily    String  @map("font_family")
+  socialsJson   Json    @map("socials_json")
+  views         Int
+  user          User    @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Session {
+  sessionId String   @id @map("session_id")
+  username  String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@index([username], map: "sessions_username_idx")
+  @@map("sessions")
+}
+
+model ProfileViewEvent {
+  id           String   @id @default(cuid())
+  username     String
+  referrerHost String?  @map("referrer_host")
+  createdAt    DateTime @default(now()) @map("created_at")
+  user         User     @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@index([username, createdAt], map: "profile_view_events_username_created_at_idx")
+  @@index([referrerHost], map: "profile_view_events_referrer_host_idx")
+  @@map("profile_view_events")
+}
+
+model SocialClickEvent {
+  id           String   @id @default(cuid())
+  username     String
+  platform     String
+  url          String
+  referrerHost String?  @map("referrer_host")
+  createdAt    DateTime @default(now()) @map("created_at")
+  user         User     @relation(fields: [username], references: [username], onDelete: Cascade)
+
+  @@index([username, createdAt], map: "social_click_events_username_created_at_idx")
+  @@index([platform], map: "social_click_events_platform_idx")
+  @@map("social_click_events")
+}

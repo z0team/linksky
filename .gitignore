@@ -1,0 +1,12 @@
+node_modules/
+.next/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+database.json
+public/uploads/
