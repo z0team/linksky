@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, ArrowLeft, Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
@@ -11,6 +11,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const identifierId = useId();
+  const passwordId = useId();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -66,8 +68,9 @@ export default function Login() {
         {error && <div className="bg-red-500/10 border border-red-500/25 text-red-300 p-3.5 rounded-xl mb-5 text-sm">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Email or Username" icon={<Mail size={15} />}>
+          <Field label="Email or Username" icon={<Mail size={15} />} htmlFor={identifierId}>
             <input
+              id={identifierId}
               required
               name="identifier"
               type="text"
@@ -77,15 +80,22 @@ export default function Login() {
             />
           </Field>
 
-          <Field label="Password" icon={<Lock size={15} />}>
+          <Field label="Password" icon={<Lock size={15} />} htmlFor={passwordId}>
             <input
+              id={passwordId}
               required
               name="password"
               type={showPassword ? 'text' : 'password'}
               className="w-full bg-transparent text-white placeholder:text-neutral-500 focus:outline-none"
               placeholder="Password"
             />
-            <button type="button" onClick={() => setShowPassword((v) => !v)} className="text-neutral-400 hover:text-white">
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              title={showPassword ? 'Hide password' : 'Show password'}
+              className="text-neutral-400 hover:text-white"
+            >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </Field>
@@ -108,11 +118,21 @@ export default function Login() {
   );
 }
 
-function Field({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Field({
+  label,
+  icon,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="text-sm text-neutral-300 mb-1.5 inline-flex items-center gap-2">{icon} {label}</span>
+    <div className="block">
+      <label htmlFor={htmlFor} className="mb-1.5 inline-flex items-center gap-2 text-sm text-neutral-300">{icon} {label}</label>
       <div className="w-full bg-black/45 border border-white/15 rounded-xl px-3.5 py-3 flex items-center gap-2">{children}</div>
-    </label>
+    </div>
   );
 }

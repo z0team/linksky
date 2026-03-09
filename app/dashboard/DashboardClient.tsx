@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import NextImage from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
 import { type Area } from 'react-easy-crop';
@@ -12,7 +13,8 @@ import {
   Copy,
   ExternalLink,
   RotateCcw,
-  SlidersHorizontal,
+  ChevronUp,
+  ChevronDown,
   Eye,
   EyeOff,
   Plus,
@@ -32,19 +34,18 @@ import {
   Disc3,
   User,
   BadgeCheck,
-  Home,
-  WandSparkles,
   GripVertical,
   BarChart3,
   Activity,
   CheckCircle2,
-  Clock3,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
 import type { ProfileAnalytics, SocialLink, UserProfile } from '@/lib/db';
+import { useLiteMode } from '@/lib/use-lite-mode';
 import { AnalyticsOverview } from './dashboard-analytics';
 import {
   AvatarCropModal,
+  ConfirmDialog,
   BackgroundCropModal,
   Input,
   MediaCard,
@@ -52,10 +53,9 @@ import {
   RangeRow,
   TabButton,
   Toggle,
-  type UploadKind,
 } from './dashboard-ui';
 
-type Section = 'customize' | 'links';
+type Section = 'overview' | 'media' | 'profile' | 'appearance' | 'links';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface ProfileForm {
@@ -435,12 +435,20 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const { pushToast } = useToast();
+  const liteMode = useLiteMode();
 
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [copied, setCopied] = useState(false);
-  const [section, setSection] = useState<Section>('customize');
+  const [section, setSection] = useState<Section>('overview');
   const [analytics] = useState<ProfileAnalytics>(initialAnalytics);
   const [draggedSocialId, setDraggedSocialId] = useState<string | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resettingProfile, setResettingProfile] = useState(false);
+  const sectionTopRef = useRef<HTMLDivElement | null>(null);
+  const didMountSectionRef = useRef(false);
+  const bioFieldId = useId();
+  const accentColorLabelId = useId();
+  const fontFamilyId = useId();
 
   const user = useMemo(() => ({ username: initialUsername }), [initialUsername]);
   const [formData, setFormData] = useState<ProfileForm>(() => toProfileForm(initialProfile));
@@ -704,16 +712,28 @@ export default function DashboardClient({
   };
 
   const resetLook = () => {
-    setFormData((prev) => ({
-      ...prev,
-      accentColor: '#8ea7ff',
-      cardOpacity: 0.4,
-      blurStrength: 20,
-      showViews: true,
-      enableGlow: true,
-      fontFamily: 'sans',
-      enterText: '[ click to enter ]',
-    }));
+    setResetConfirmOpen(true);
+  };
+
+  const confirmResetProfile = async () => {
+    setResettingProfile(true);
+    const nextFormData = toProfileForm(undefined);
+    const nextSocialItems: SocialFormItem[] = [];
+    const saved = await persistProfile(nextFormData, nextSocialItems, { silent: true });
+
+    if (saved) {
+      setFormData(nextFormData);
+      setSocialItems(nextSocialItems);
+      setSection('overview');
+      setResetConfirmOpen(false);
+      pushToast({
+        title: 'Profile reset',
+        description: 'Media, links, text and styling were cleared.',
+        variant: 'success',
+      });
+    }
+
+    setResettingProfile(false);
   };
 
   const addSocial = (platform: string) => {
@@ -735,6 +755,16 @@ export default function DashboardClient({
       const fromIndex = prev.findIndex((item) => item.id === fromId);
       const toIndex = prev.findIndex((item) => item.id === toId);
       return moveItem(prev, fromIndex, toIndex);
+    });
+  }, []);
+
+  const nudgeSocial = useCallback((id: string, direction: 'up' | 'down') => {
+    setSocialItems((prev) => {
+      const currentIndex = prev.findIndex((item) => item.id === id);
+      if (currentIndex === -1) return prev;
+
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      return moveItem(prev, currentIndex, targetIndex);
     });
   }, []);
 
@@ -766,14 +796,6 @@ export default function DashboardClient({
     return () => window.clearTimeout(timeoutId);
   }, [formData, persistProfile, saveState, socialItems]);
   const accentColor = formData.accentColor || '#8ea7ff';
-  const saveStatusLabel =
-    saveState === 'saving'
-      ? 'Saving changes...'
-      : saveState === 'saved'
-        ? 'All changes saved'
-        : saveState === 'error'
-          ? 'Save failed'
-          : 'Autosave enabled';
   const dashboardTheme = useMemo(
     () =>
       ({
@@ -785,6 +807,73 @@ export default function DashboardClient({
       }) as React.CSSProperties,
     [accentColor],
   );
+  const hasBio = formData.bio.trim().length > 0;
+  const hasLinks = socialItems.some((item) => item.url.trim().length > 0);
+  const hasSong = formData.musicUrl.trim().length > 0;
+  const publishedLinksCount = socialItems.filter((item) => item.url.trim().length > 0).length;
+  const quickColors = ['#8ea7ff', '#60a5fa', '#34d399', '#f59e0b', '#f97316'];
+  const checklistItems = [
+    { label: 'Display name', done: formData.displayName.trim().length > 0 },
+    { label: 'Avatar', done: formData.avatarUrl.trim().length > 0 },
+    { label: 'Background', done: formData.backgroundUrl.trim().length > 0 },
+    { label: 'Bio', done: hasBio },
+    { label: 'Link', done: hasLinks },
+  ];
+  const completedChecklistCount = checklistItems.filter((item) => item.done).length;
+  const completionPercent = Math.round((completedChecklistCount / checklistItems.length) * 100);
+  const completionLabel =
+    completionPercent >= 80 ? 'Ready to share' : completionPercent >= 50 ? 'Almost there' : 'Needs setup';
+  const overviewItems = [
+    {
+      label: 'Media',
+      value: [formData.avatarUrl, formData.backgroundUrl, formData.musicUrl, formData.cursorUrl].filter((item) => item.trim().length > 0).length,
+      hint: 'avatar, background, music, cursor',
+    },
+    {
+      label: 'Profile',
+      value: [formData.displayName, formData.status, formData.location, formData.bio].filter((item) => item.trim().length > 0).length,
+      hint: 'name, status, location, bio',
+    },
+    {
+      label: 'Appearance',
+      value: [formData.accentColor, formData.enterText, formData.fontFamily].filter((item) => item.trim().length > 0).length,
+      hint: 'accent, enter text, font',
+    },
+    {
+      label: 'Links',
+      value: publishedLinksCount,
+      hint: 'published social links',
+    },
+  ];
+  const sectionItems = [
+    { id: 'overview' as Section, label: 'Overview', mobileLabel: 'Overview', icon: BarChart3 },
+    { id: 'media' as Section, label: 'Media', mobileLabel: 'Media', icon: ImageIcon },
+    { id: 'profile' as Section, label: 'Profile', mobileLabel: 'Profile', icon: User },
+    { id: 'appearance' as Section, label: 'Appearance', mobileLabel: 'Style', icon: Sparkles },
+    { id: 'links' as Section, label: 'Links', mobileLabel: 'Links', icon: LinkIcon },
+  ];
+  const activeSection = sectionItems.find((item) => item.id === section) || sectionItems[0];
+  const saveStateLabel =
+    saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Error' : 'Draft';
+  const saveStateBadgeClass =
+    saveState === 'saving'
+      ? 'border-sky-400/35 bg-sky-500/10 text-sky-100'
+      : saveState === 'saved'
+         ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-100'
+         : saveState === 'error'
+           ? 'border-red-400/35 bg-red-500/10 text-red-100'
+           : 'border-white/10 bg-white/[0.04] text-neutral-300';
+
+  useEffect(() => {
+    if (!didMountSectionRef.current) {
+      didMountSectionRef.current = true;
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      sectionTopRef.current?.scrollIntoView({ behavior: liteMode ? 'auto' : 'smooth', block: 'start' });
+    }
+  }, [liteMode, section]);
 
   return (
     <div
@@ -792,66 +881,209 @@ export default function DashboardClient({
       className="min-h-screen bg-[radial-gradient(circle_at_8%_-12%,rgba(112,130,255,0.2),transparent_36%),radial-gradient(circle_at_92%_5%,rgba(87,173,255,0.16),transparent_35%),linear-gradient(180deg,#0a111d_0%,#090f19_100%)] text-white lg:h-screen lg:overflow-hidden"
     >
       <div className="flex min-h-screen flex-col lg:h-screen lg:flex-row">
-        <aside className="w-full lg:w-72 lg:shrink-0 bg-[#0f1625]/92 backdrop-blur-2xl p-4 lg:h-screen lg:overflow-y-auto flex flex-col border-b lg:border-b-0 lg:border-r border-white/5 shadow-[0_16px_34px_rgba(0,0,0,0.22)] lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05),0_30px_55px_rgba(0,0,0,0.42)]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#6f88ff] via-[#8a76ff] to-[#b568ff] flex items-center justify-center shadow-[0_10px_24px_rgba(126,122,255,0.5)]">
-              <Sparkles size={18} />
+        <aside className="hidden w-full flex-col border-b border-white/5 bg-[#0f1625]/92 p-4 shadow-[0_16px_34px_rgba(0,0,0,0.22)] backdrop-blur-2xl lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05),0_30px_55px_rgba(0,0,0,0.42)]">
+          <Link href="/" className="mb-4 flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.04] p-3 transition-all duration-200 hover:bg-white/[0.07] hover:-translate-y-0.5">
+            <div className="relative h-12 w-12 overflow-hidden rounded-2xl shadow-[0_10px_24px_rgba(95,168,255,0.22)]">
+              <NextImage
+                src="/icon.svg"
+                alt="LinkSky"
+                fill
+                sizes="48px"
+                className="object-cover"
+              />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-500">LinkSky studio</p>
-              <p className="font-semibold text-neutral-100">Profile controls</p>
+              <p className="text-[14px] uppercase tracking-[0.22em] text-neutral-200">LinkSky editor</p>
             </div>
-          </div>
+          </Link>
 
-          <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-neutral-300 inline-flex items-center gap-2">
-            <WandSparkles size={13} className="text-[var(--accent)]" />
-            Built for a polished public profile
-          </div>
-
-          <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.045] p-3.5 shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-neutral-400">
-              {saveState === 'saving' ? <Loader2 size={13} className="animate-spin" /> : saveState === 'saved' ? <CheckCircle2 size={13} className="text-emerald-300" /> : saveState === 'error' ? <Activity size={13} className="text-red-300" /> : <Clock3 size={13} />}
-              {saveStatusLabel}
+          <div className="mb-4 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,22,36,0.88),rgba(12,17,29,0.88))] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Profile completion</p>
+                <p className="mt-2 text-3xl font-black tracking-tight text-white">{completionPercent}%</p>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-neutral-300">
+                {completionLabel}
+              </div>
             </div>
-            <p className="mt-2 text-xs text-neutral-500">Text fields autosave after a short pause. Media uploads save immediately.</p>
+            <p className="mt-3 text-xs leading-5 text-neutral-500">Fill the basics first: avatar, background, bio and at least one link.</p>
           </div>
 
           <div className="space-y-2">
-            <TabButton label="Customize" icon={<Home size={16} />} active={section === 'customize'} onClick={() => setSection('customize')} />
-            <TabButton label="Links" icon={<LinkIcon size={16} />} active={section === 'links'} onClick={() => setSection('links')} />
+            {sectionItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <TabButton
+                  key={item.id}
+                  label={item.label}
+                  icon={<Icon size={16} />}
+                  active={section === item.id}
+                  onClick={() => setSection(item.id)}
+                />
+              );
+            })}
           </div>
 
-          <div className="mt-auto pt-5">
-            <div className="rounded-2xl bg-white/[0.045] backdrop-blur-md p-3.5 flex items-center gap-3 shadow-[0_14px_32px_rgba(0,0,0,0.3)] transition-all duration-200 hover:bg-white/[0.065] hover:-translate-y-0.5">
-              <div className="relative w-11 h-11 rounded-full bg-neutral-700 overflow-hidden shrink-0 ring-1 ring-[#334155]">
+          <div className="mt-auto space-y-4 pt-5">
+            <div className="flex items-center gap-3 rounded-[24px] bg-white/[0.045] p-3.5 shadow-[0_14px_32px_rgba(0,0,0,0.3)] transition-all duration-200 hover:bg-white/[0.065] hover:-translate-y-0.5">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-neutral-700 ring-1 ring-[#334155]">
                 {formData.avatarUrl ? (
                   <NextImage
                     src={formData.avatarUrl}
                     alt="avatar"
                     fill
-                    sizes="44px"
+                    sizes="48px"
                     className="object-cover"
                     unoptimized
                   />
-                ) : null}
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white/75">
+                    {(formData.displayName || user.username).charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">{formData.displayName || user.username}</p>
-                <p className="text-xs text-neutral-400 truncate">{profileUrl}</p>
+                <p className="truncate text-sm font-semibold">{formData.displayName || user.username}</p>
+                <p className="truncate text-xs text-neutral-400">{profileUrl}</p>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Checklist</p>
+              <div className="mt-3 space-y-2">
+                {checklistItems.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-3 py-2 text-sm">
+                    <span className="text-neutral-200">{item.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${item.done ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/[0.05] text-neutral-400'}`}>
+                      {item.done ? 'Done' : 'Pending'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </aside>
 
-        <main className="relative flex-1 min-w-0 lg:h-screen lg:overflow-y-auto bg-[#0b111c]">
+        <main className="relative min-w-0 flex-1 bg-[#0b111c] pb-24 lg:h-screen lg:overflow-y-auto lg:pb-0">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_-10%,rgba(134,153,255,0.08),transparent_35%)]" />
-          <header className="relative border-b border-white/5 p-4 md:p-5 lg:sticky lg:top-0 lg:z-30 overflow-hidden">
+          <div className="sticky top-0 z-30 border-b border-white/8 bg-[#0b111c]/92 backdrop-blur-2xl lg:hidden">
+            <div className="p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Link href="/" className="flex min-w-0 items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-2xl shadow-[0_10px_24px_rgba(95,168,255,0.22)]">
+                    <NextImage
+                      src="/icon.svg"
+                      alt="LinkSky"
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] uppercase tracking-[0.22em] text-neutral-400">LinkSky editor</p>
+                    <p className="truncate text-sm font-semibold text-white">{user.username}</p>
+                  </div>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-neutral-200 transition-all duration-200 hover:bg-white/[0.08]"
+                  aria-label="Logout"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+
+              <div className="mt-3 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,22,36,0.92),rgba(12,17,29,0.92))] p-3 shadow-[0_16px_32px_rgba(0,0,0,0.24)]">
+                <div className="flex items-center gap-3">
+                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-neutral-700 ring-1 ring-[#334155]">
+                    {formData.avatarUrl ? (
+                      <NextImage
+                        src={formData.avatarUrl}
+                        alt="avatar"
+                        fill
+                        sizes="44px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white/75">
+                        {(formData.displayName || user.username).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white">{formData.displayName || user.username}</p>
+                    <p className="truncate text-xs text-neutral-400">@{user.username} · {activeSection.label}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] text-neutral-200">
+                      {completionPercent}%
+                    </div>
+                    <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${saveStateBadgeClass}`}>
+                      {saveState === 'saving' ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                      {saveStateLabel}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 text-xs text-neutral-400">
+                  <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">
+                    {completionLabel}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  <a
+                    href={profileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open profile"
+                    title="Open profile"
+                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#334155] bg-[#111827]/80 text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
+                  >
+                    <ExternalLink size={15} />
+                  </a>
+                  <button
+                    onClick={handleCopy}
+                    aria-label={copied ? 'Copied profile URL' : 'Copy profile URL'}
+                    title={copied ? 'Copied profile URL' : 'Copy profile URL'}
+                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#334155] bg-[#111827]/80 text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
+                  >
+                    <Copy size={15} />
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saveState === 'saving'}
+                    aria-label="Save changes"
+                    title="Save changes"
+                    className="inline-flex h-11 items-center justify-center rounded-2xl text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                  </button>
+                  <button
+                    onClick={resetLook}
+                    aria-label="Reset profile"
+                    title="Reset profile"
+                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-red-500/40 bg-red-500/10 text-red-200 transition-all duration-200 hover:bg-red-500/16"
+                  >
+                    <RotateCcw size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <header className="relative hidden overflow-hidden border-b border-white/5 p-4 md:p-5 lg:sticky lg:top-0 lg:z-30 lg:block">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0,rgba(142,167,255,0.2),transparent_42%),linear-gradient(120deg,rgba(17,24,39,0.92),rgba(11,15,23,0.9))]" />
-            <div className="relative flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
-              <div>
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
                 <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">Studio</p>
-                <h1 className="text-2xl md:text-3xl font-black tracking-tight mt-1">{user.username}</h1>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-neutral-300">
+                <h1 className="mt-1 text-2xl font-black tracking-tight md:text-3xl">{user.username}</h1>
+                <p className="mt-2 text-sm leading-6 text-neutral-400 md:text-base">
+                  Update the essentials, keep the public page readable, and publish faster.
+                </p>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-neutral-300">
                   <BarChart3 size={13} className="text-[var(--accent)]" />
                   {analytics.totalViews} views
                   <span className="text-white/20">/</span>
@@ -860,41 +1092,41 @@ export default function DashboardClient({
                   {analytics.ctr}% CTR
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 <a
                   href={profileUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2.5 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
                 >
                   <ExternalLink size={15} />
-                  Open
+                  Open profile
                 </a>
                 <button
                   onClick={handleCopy}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2.5 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
                 >
                   <Copy size={15} />
                   {copied ? 'Copied' : 'Copy URL'}
                 </button>
                 <button
                   onClick={resetLook}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/45 bg-red-500/10 px-3.5 py-2 text-sm text-red-200 transition-all duration-200 hover:bg-red-500/16"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/45 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-200 transition-all duration-200 hover:bg-red-500/16"
                 >
                   <RotateCcw size={15} />
-                  Reset style
+                  Reset profile
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saveState === 'saving'}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                   Save now
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-transparent px-3.5 py-2 text-sm text-neutral-200 transition-all duration-200 hover:bg-[#141c2b]"
+                  className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-transparent px-3.5 py-2.5 text-sm text-neutral-200 transition-all duration-200 hover:bg-[#141c2b] sm:col-span-1"
                 >
                   <LogOut size={15} />
                   Logout
@@ -902,19 +1134,57 @@ export default function DashboardClient({
               </div>
             </div>
           </header>
-          <section className="p-4 md:p-5 space-y-4">
+          <section ref={sectionTopRef} className="scroll-mt-52 space-y-4 p-4 pb-6 md:p-5 lg:scroll-mt-24 lg:pb-5">
+            <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-4 ${section === 'overview' ? '' : 'hidden lg:grid'}`}>
+              <QuickStatCard label="Completion" value={`${completionPercent}%`} hint={completionLabel} icon={<Sparkles size={15} />} />
+              <QuickStatCard label="Views" value={analytics.totalViews.toString()} hint="All time" icon={<BarChart3 size={15} />} />
+              <QuickStatCard label="Clicks" value={analytics.totalClicks.toString()} hint={`${analytics.ctr}% CTR`} icon={<Activity size={15} />} />
+              <QuickStatCard label="Links ready" value={publishedLinksCount.toString()} hint={publishedLinksCount ? 'Ready to share' : 'Add your first link'} icon={<LinkIcon size={15} />} />
+            </div>
             <AnimatePresence mode="wait" initial={false}>
-              {section === 'customize' ? (
+              {section !== 'links' ? (
                 <motion.div
-                  key="customize"
+                  key={section}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.18 }}
+                  transition={{ duration: liteMode ? 0.01 : 0.18 }}
                   className="space-y-4"
                 >
-                  <Panel title="Media">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-3">
+                  {section === 'overview' && (
+                    <Panel title="Overview" description="A simple summary of what is ready and what still needs attention.">
+                      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                        {overviewItems.map((item) => (
+                          <div key={item.label} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
+                            <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">{item.label}</p>
+                            <p className="mt-2 text-2xl font-black tracking-tight text-white md:text-3xl">{item.value}</p>
+                            <p className="mt-1 text-xs leading-5 text-neutral-400">{item.hint}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-3">
+                        <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">Profile status</p>
+                          <p className="mt-2 text-base font-semibold text-white md:text-lg">{completionLabel}</p>
+                          <p className="mt-1 text-xs leading-5 text-neutral-400">Minimal, shareable profile setup.</p>
+                        </div>
+                        <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">Audio</p>
+                          <p className="mt-2 text-base font-semibold text-white md:text-lg">{hasSong ? (formData.songTitle || 'Track uploaded') : 'No audio yet'}</p>
+                          <p className="mt-1 text-xs leading-5 text-neutral-400">Optional background music for the public page.</p>
+                        </div>
+                        <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">Links</p>
+                          <p className="mt-2 text-base font-semibold text-white md:text-lg">{publishedLinksCount ? `${publishedLinksCount} ready` : 'No links yet'}</p>
+                          <p className="mt-1 text-xs leading-5 text-neutral-400">People need at least one clear place to click.</p>
+                        </div>
+                      </div>
+                    </Panel>
+                  )}
+
+                  {section === 'media' && (
+                    <Panel title="Media" description="Upload the pieces users notice first. Media saves immediately after upload.">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                       <MediaCard
                         label="Background"
                         kind="background"
@@ -960,29 +1230,34 @@ export default function DashboardClient({
                         icon={<MousePointer2 size={15} />}
                       />
                     </div>
-                  </Panel>
+                    </Panel>
+                  )}
 
-                  <Panel title="Analytics snapshot">
-                    <AnalyticsOverview analytics={analytics} />
-                  </Panel>
+                  {section === 'overview' && (
+                    <Panel title="Analytics snapshot" description="Recent performance for the current public profile.">
+                      <AnalyticsOverview analytics={analytics} />
+                    </Panel>
+                  )}
 
-                  <Panel title="Profile details">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {section === 'profile' && (
+                    <Panel title="Profile details" description="Keep the first screen short, recognizable and readable.">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <Input label="Display name" value={formData.displayName} onChange={(v) => setFormData((p) => ({ ...p, displayName: v }))} placeholder="username" />
                       <Input label="Location" value={formData.location} onChange={(v) => setFormData((p) => ({ ...p, location: v }))} placeholder="Kyiv" />
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-[#2a3447] bg-[#0b1220]/75 p-4 md:p-5 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
                       <p className="text-[11px] uppercase tracking-[0.22em] text-neutral-500 mb-3">Now playing</p>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <Input label="Status" value={formData.status} onChange={(v) => setFormData((p) => ({ ...p, status: v }))} placeholder="Online" icon={<BadgeCheck size={14} />} />
                         <Input label="Song title" value={formData.songTitle} onChange={(v) => setFormData((p) => ({ ...p, songTitle: v }))} placeholder="Artist - Track" />
                       </div>
                     </div>
 
                     <div className="mt-4">
-                      <label className="text-xs uppercase tracking-[0.18em] text-neutral-400 mb-2 block">Bio</label>
+                      <label htmlFor={bioFieldId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-neutral-400">Bio</label>
                       <textarea
+                        id={bioFieldId}
                         value={formData.bio}
                         onChange={(e) => setFormData((p) => ({ ...p, bio: e.target.value }))}
                         rows={4}
@@ -990,40 +1265,64 @@ export default function DashboardClient({
                         placeholder="Tell people who you are"
                       />
                     </div>
-                  </Panel>
+                    </Panel>
+                  )}
 
-                  <Panel title="Look & behavior">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {section === 'appearance' && (
+                    <Panel title="Look & behavior" description="Tune the accent, entry copy and visibility without overcomplicating the page.">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
-                        <label className="text-xs uppercase tracking-[0.18em] text-neutral-400 mb-2 block">Accent color</label>
+                        <label id={accentColorLabelId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-neutral-400">Accent color</label>
                         <div className="flex items-center gap-3">
                           <input
                             type="color"
                             value={formData.accentColor}
                             onChange={(e) => setFormData((p) => ({ ...p, accentColor: e.target.value }))}
+                            aria-labelledby={accentColorLabelId}
+                            aria-label="Accent color picker"
                             className="h-11 w-12 rounded-xl bg-transparent border border-[#2e3a50]"
                           />
                           <input
                             value={formData.accentColor}
                             onChange={(e) => setFormData((p) => ({ ...p, accentColor: e.target.value }))}
+                            aria-labelledby={accentColorLabelId}
+                            aria-label="Accent color hex value"
+                            placeholder="#8ea7ff"
                             className="flex-1 rounded-2xl bg-[#0b1220] border border-[#273247] px-3.5 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
                           />
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {quickColors.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setFormData((p) => ({ ...p, accentColor: color }))}
+                              aria-label={`Set accent color ${color}`}
+                              className={`h-8 w-8 rounded-full border transition-transform hover:scale-105 ${
+                                formData.accentColor.toLowerCase() === color.toLowerCase()
+                                  ? 'border-white shadow-[0_0_0_2px_rgba(255,255,255,0.12)]'
+                                  : 'border-white/10'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
                         </div>
                       </div>
                       <Input label="Enter text" value={formData.enterText} onChange={(v) => setFormData((p) => ({ ...p, enterText: v }))} placeholder="[ click to enter ]" />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                       <RangeRow label="Card opacity" value={formData.cardOpacity} min={0.2} max={0.9} step={0.05} onChange={(v) => setFormData((p) => ({ ...p, cardOpacity: v }))} />
                       <RangeRow label="Blur strength" value={formData.blurStrength} min={0} max={32} step={1} onChange={(v) => setFormData((p) => ({ ...p, blurStrength: v }))} />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <Toggle label="Show views" value={formData.showViews} onToggle={(v) => setFormData((p) => ({ ...p, showViews: v }))} icon={formData.showViews ? <Eye size={14} /> : <EyeOff size={14} />} />
                       <Toggle label="Glow" value={formData.enableGlow} onToggle={(v) => setFormData((p) => ({ ...p, enableGlow: v }))} icon={<Sparkles size={14} />} />
                       <div>
-                        <label className="text-xs uppercase tracking-[0.18em] text-neutral-400 mb-2 block">Font</label>
+                        <label htmlFor={fontFamilyId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-neutral-400">Font</label>
                         <select
+                          id={fontFamilyId}
                           value={formData.fontFamily}
                           onChange={(e) => setFormData((p) => ({ ...p, fontFamily: e.target.value as ProfileForm['fontFamily'] }))}
                           className="w-full rounded-2xl bg-[#0b1220] border border-[#273247] px-3.5 py-2.5 text-sm text-neutral-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
@@ -1034,7 +1333,8 @@ export default function DashboardClient({
                         </select>
                       </div>
                     </div>
-                  </Panel>
+                    </Panel>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div
@@ -1042,16 +1342,18 @@ export default function DashboardClient({
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.18 }}
+                  transition={{ duration: liteMode ? 0.01 : 0.18 }}
                   className="space-y-4"
                 >
-                  <Panel title="Add social links">
-                    <div className="grid grid-cols-5 sm:grid-cols-7 lg:grid-cols-10 gap-2">
+                  <Panel title="Add social links" description="Start with the platforms people already expect to find.">
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 lg:grid-cols-10">
                       {SOCIAL_PRESETS.map((platform) => (
                         <button
                           key={platform}
+                          type="button"
                           onClick={() => addSocial(platform)}
-                          className="h-12 rounded-xl border border-[#2b3548] bg-[#0f1728]/70 hover:bg-[#1c263a] hover:border-[#3b4a62] transition-all duration-200 flex items-center justify-center"
+                          aria-label={`Add ${platform} link`}
+                          className="flex h-14 items-center justify-center rounded-xl border border-[#2b3548] bg-[#0f1728]/70 transition-all duration-200 hover:border-[#3b4a62] hover:bg-[#1c263a]"
                           title={platform}
                         >
                           {SOCIAL_ICON_MAP[platform] || <span className="text-xs uppercase text-neutral-300">{platform.slice(0, 2)}</span>}
@@ -1060,18 +1362,21 @@ export default function DashboardClient({
                     </div>
                   </Panel>
 
-                  <Panel title="Your links">
-                    <div className="flex justify-end mb-3">
-                      <button onClick={() => addSocial('custom')} className="inline-flex items-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm hover:bg-[#1a2436] transition-all duration-200">
+                  <Panel
+                    title="Your links"
+                    description="Use arrows on mobile or drag on desktop. Links without a URL will not be shown publicly."
+                    actions={
+                      <button type="button" onClick={() => addSocial('custom')} className="inline-flex items-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm hover:bg-[#1a2436] transition-all duration-200">
                         <Plus size={15} />
                         Add custom
                       </button>
-                    </div>
+                    }
+                  >
 
-                    {!socialItems.length && <p className="text-neutral-400">No links yet.</p>}
+                    {!socialItems.length && <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-neutral-400">No links yet.</p>}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      {socialItems.map((item) => (
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      {socialItems.map((item, index) => (
                         <div
                           key={item.id}
                           draggable
@@ -1084,7 +1389,7 @@ export default function DashboardClient({
                             setDraggedSocialId(null);
                           }}
                           onDragEnd={() => setDraggedSocialId(null)}
-                          className={`rounded-2xl border p-3 space-y-2 shadow-[0_10px_24px_rgba(0,0,0,0.28)] transition-all duration-200 hover:-translate-y-0.5 ${
+                          className={`space-y-2 rounded-2xl border p-3 shadow-[0_10px_24px_rgba(0,0,0,0.28)] transition-all duration-200 hover:-translate-y-0.5 ${
                             draggedSocialId === item.id
                               ? 'border-[var(--accent-border)] bg-[#152036]'
                               : 'border-[#2a3548] bg-[#111827]/85'
@@ -1095,17 +1400,40 @@ export default function DashboardClient({
                               <button
                                 type="button"
                                 title="Drag to reorder"
-                                className="h-9 w-9 rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-400 flex items-center justify-center cursor-grab active:cursor-grabbing"
+                                aria-label="Drag to reorder link"
+                                className="hidden h-9 w-9 rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-400 lg:flex lg:items-center lg:justify-center lg:cursor-grab lg:active:cursor-grabbing"
                               >
                                 <GripVertical size={15} />
                               </button>
+                              <div className="flex items-center gap-1 lg:hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => nudgeSocial(item.id, 'up')}
+                                  disabled={index === 0}
+                                  aria-label="Move link up"
+                                  title="Move link up"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-300 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-35"
+                                >
+                                  <ChevronUp size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => nudgeSocial(item.id, 'down')}
+                                  disabled={index === socialItems.length - 1}
+                                  aria-label="Move link down"
+                                  title="Move link down"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-300 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-35"
+                                >
+                                  <ChevronDown size={15} />
+                                </button>
+                              </div>
                               <select value={item.platform} onChange={(e) => updateSocial(item.id, { platform: e.target.value })} aria-label="Social platform" className="rounded-xl bg-[#0b1220] border border-[#273247] px-3 py-2 text-sm text-neutral-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]">
                                 {SOCIAL_PRESETS.map((platform) => (
                                   <option key={platform} value={platform}>{platform}</option>
                                 ))}
                               </select>
                             </div>
-                            <button type="button" title="Delete link" onClick={() => removeSocial(item.id)} className="h-9 w-9 rounded-xl border border-red-500/35 bg-red-500/10 text-red-300 flex items-center justify-center transition-all duration-200 hover:bg-red-500/20">
+                            <button type="button" title="Delete link" aria-label="Delete link" onClick={() => removeSocial(item.id)} className="h-9 w-9 rounded-xl border border-red-500/35 bg-red-500/10 text-red-300 flex items-center justify-center transition-all duration-200 hover:bg-red-500/20">
                               <Trash2 size={15} />
                             </button>
                           </div>
@@ -1136,6 +1464,41 @@ export default function DashboardClient({
           </section>
         </main>
       </div>
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b111c]/95 px-2 py-2 backdrop-blur-2xl lg:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
+          {sectionItems.map((item) => {
+            const Icon = item.icon;
+            const active = section === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSection(item.id)}
+                className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium transition-all duration-200 ${
+                  active
+                    ? 'bg-[var(--accent-soft)] text-white shadow-[0_10px_24px_var(--accent-glow)]'
+                    : 'text-neutral-400 hover:bg-white/[0.05] hover:text-white'
+                }`}
+              >
+                <Icon size={17} />
+                <span className="truncate">{item.mobileLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title="Reset profile?"
+        description="This will clear media, links, bio, status, colors and other custom settings. Your account and username will stay the same."
+        confirmLabel="Reset everything"
+        loading={resettingProfile}
+        onCancel={() => {
+          if (resettingProfile) return;
+          setResetConfirmOpen(false);
+        }}
+        onConfirm={confirmResetProfile}
+      />
       <AvatarCropModal
         open={avatarCrop.open}
         src={avatarCrop.src}
@@ -1168,6 +1531,25 @@ export default function DashboardClient({
   );
 }
 
-
-
-
+function QuickStatCard({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(14,20,34,0.88),rgba(11,17,29,0.82))] p-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] sm:p-3.5">
+      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-2 text-xl font-black tracking-tight text-white sm:text-2xl">{value}</p>
+      <p className="mt-1 text-xs leading-5 text-neutral-400">{hint}</p>
+    </div>
+  );
+}

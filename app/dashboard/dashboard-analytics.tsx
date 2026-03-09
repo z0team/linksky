@@ -4,6 +4,8 @@ import { BarChart3, Eye, MousePointerClick } from 'lucide-react';
 import type { ProfileAnalytics } from '@/lib/db';
 
 export function AnalyticsOverview({ analytics }: { analytics: ProfileAnalytics }) {
+  const maxViewsCount = analytics.viewsByDay.reduce((max, point) => Math.max(max, point.count), 1);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -20,8 +22,7 @@ export function AnalyticsOverview({ analytics }: { analytics: ProfileAnalytics }
           </div>
           <div className="mt-4 flex h-36 items-end gap-2">
             {analytics.viewsByDay.map((point) => {
-              const maxCount = Math.max(...analytics.viewsByDay.map((item) => item.count), 1);
-              const height = Math.max(8, Math.round((point.count / maxCount) * 100));
+              const height = Math.max(8, Math.round((point.count / maxViewsCount) * 100));
               return (
                 <div key={point.label} className="flex-1">
                   <div

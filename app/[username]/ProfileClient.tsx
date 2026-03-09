@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import type { SocialLink, UserProfile } from '@/lib/db';
+import { useLiteMode } from '@/lib/use-lite-mode';
 
 const normalizeUrl = (url: string) => {
   const trimmed = url.trim();
@@ -85,6 +86,7 @@ const normalizeSocials = (socials: unknown): SocialLink[] => {
 };
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const PROMO_BANNER_STORAGE_KEY = 'linksky-promo-banner-seen';
 
 export default function ProfileClient({
   profile,
@@ -96,11 +98,12 @@ export default function ProfileClient({
   previewMode?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
+  const liteMode = useLiteMode(!!reduceMotion);
   const [entered, setEntered] = useState(previewMode);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showPromoBanner, setShowPromoBanner] = useState(!previewMode);
+  const [showPromoBanner, setShowPromoBanner] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const viewTrackedRef = useRef(false);
 
@@ -145,7 +148,18 @@ export default function ProfileClient({
 
   const handleEnter = () => {
     setEntered(true);
-    if (audioRef.current && profile.musicUrl) {
+    if (!previewMode) {
+      try {
+        if (window.localStorage.getItem(PROMO_BANNER_STORAGE_KEY) !== '1') {
+          window.localStorage.setItem(PROMO_BANNER_STORAGE_KEY, '1');
+          setShowPromoBanner(true);
+        }
+      } catch {
+        setShowPromoBanner(true);
+      }
+    }
+
+    if (!liteMode && audioRef.current && profile.musicUrl) {
       audioRef.current.volume = 0.5;
       audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
     }
@@ -193,10 +207,11 @@ export default function ProfileClient({
 
   const socials = useMemo(() => normalizeSocials(profile.socials), [profile.socials]);
 
-  const contentTransition = reduceMotion
+  const contentTransition = liteMode
     ? { duration: 0.01 }
     : { duration: 0.45, delay: 0.08, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] };
   const isEntered = previewMode || entered;
+  const shouldRenderVideoBackground = Boolean(isVideoBg && isEntered && !liteMode);
 
   useEffect(() => {
     if (previewMode || !isEntered || !showPromoBanner) return;
@@ -210,32 +225,37 @@ export default function ProfileClient({
       style={{
         cursor: profile.cursorUrl ? `url(${profile.cursorUrl}), auto` : 'auto',
       }}
-    >
-      <div className="fixed inset-0 z-0">
-        {isVideoBg ? (
+      >
+        <div className="fixed inset-0 z-0">
+        {shouldRenderVideoBackground ? (
           <video src={profile.backgroundUrl} autoPlay loop muted playsInline className="w-full h-full object-cover opacity-55" preload="metadata" />
         ) : (
           <div
             className="w-full h-full bg-cover bg-center opacity-55"
-            style={{ backgroundImage: `url(${profile.backgroundUrl || '/demo/background.svg'})` }}
+            style={isVideoBg
+              ? {
+                  background:
+                    `radial-gradient(circle at top, ${accentColor}26, transparent 38%), linear-gradient(180deg, rgba(7,10,18,0.95), rgba(3,5,10,0.98))`,
+                }
+              : { backgroundImage: `url(${profile.backgroundUrl || '/demo/background.svg'})` }}
           />
         )}
       </div>
 
-      {profile.musicUrl && <audio ref={audioRef} src={profile.musicUrl} loop preload="metadata" />}
+      {profile.musicUrl && <audio ref={audioRef} src={profile.musicUrl} loop preload={liteMode ? 'none' : 'metadata'} />}
 
       <AnimatePresence>
         {!isEntered && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={reduceMotion ? { duration: 0.01 } : { duration: 0.45 }}
+            transition={liteMode ? { duration: 0.01 } : { duration: 0.45 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-[2px] cursor-pointer px-4"
             onClick={handleEnter}
           >
             <motion.p
-              animate={reduceMotion ? { opacity: 1 } : { opacity: [0.5, 1, 0.5] }}
-              transition={reduceMotion ? { duration: 0 } : { repeat: Infinity, duration: 2 }}
+              animate={liteMode ? { opacity: 1 } : { opacity: [0.5, 1, 0.5] }}
+              transition={liteMode ? { duration: 0 } : { repeat: Infinity, duration: 2 }}
               className="text-lg sm:text-2xl font-light tracking-[0.25em] text-center"
             >
               {profile.enterText || '[ click to enter ]'}
@@ -247,9 +267,9 @@ export default function ProfileClient({
       <AnimatePresence>
         {isEntered && (
           <motion.div
-            initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={contentTransition}
+              initial={{ opacity: 0, scale: liteMode ? 1 : 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={contentTransition}
             className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-10"
           >
             <div
@@ -262,9 +282,9 @@ export default function ProfileClient({
             >
               <div className="flex flex-col items-center">
                 <motion.div
-                  initial={{ scale: reduceMotion ? 1 : 0.9, opacity: 0 }}
+                  initial={{ scale: liteMode ? 1 : 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={reduceMotion ? { duration: 0.01 } : { type: 'spring', delay: 0.15 }}
+                  transition={liteMode ? { duration: 0.01 } : { type: 'spring', delay: 0.15 }}
                   className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2"
                   style={{ borderColor: `${accentColor}80`, boxShadow: profile.enableGlow ? `0 0 28px ${accentColor}66` : 'none' }}
                 >
@@ -282,7 +302,7 @@ export default function ProfileClient({
                 <motion.h1
                   initial={{ y: 8, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={reduceMotion ? { duration: 0.01 } : { delay: 0.24 }}
+                  transition={liteMode ? { duration: 0.01 } : { delay: 0.24 }}
                   className="mt-5 sm:mt-6 text-xl sm:text-2xl font-semibold text-white/95 tracking-wide text-center break-words"
                 >
                   {profile.displayName || username}
@@ -301,7 +321,7 @@ export default function ProfileClient({
                   <motion.div
                     initial={{ y: 8, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={reduceMotion ? { duration: 0.01 } : { delay: 0.35 }}
+                    transition={liteMode ? { duration: 0.01 } : { delay: 0.35 }}
                     className="flex items-center justify-center gap-4 sm:gap-6 mt-6 sm:mt-8 flex-wrap"
                   >
                     {socials.map((social) => {
@@ -337,7 +357,7 @@ export default function ProfileClient({
               <motion.div
                 initial={{ y: 16, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={reduceMotion ? { duration: 0.01 } : { delay: 0.4 }}
+                transition={liteMode ? { duration: 0.01 } : { delay: 0.4 }}
                 className="w-full max-w-[92vw] sm:max-w-[520px] mt-4 border border-white/10 rounded-3xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-lg"
                 style={{
                   backgroundColor: `rgba(0,0,0,${Math.min(cardOpacity + 0.05, 0.95)})`,
@@ -385,10 +405,10 @@ export default function ProfileClient({
       <AnimatePresence>
         {isEntered && !previewMode && showPromoBanner && (
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: reduceMotion ? 1 : 0.98 }}
+            initial={{ opacity: 0, y: 16, scale: liteMode ? 1 : 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={reduceMotion ? { duration: 0.01 } : { duration: 0.28 }}
+            transition={liteMode ? { duration: 0.01 } : { duration: 0.28 }}
             className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,480px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[rgba(8,12,22,0.76)] px-4 py-3 shadow-[0_14px_34px_rgba(0,0,0,0.38)] backdrop-blur-xl"
           >
             <button

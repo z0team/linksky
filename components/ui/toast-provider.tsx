@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CheckCircle2, CircleAlert, Info, X } from 'lucide-react';
+import { useLiteMode } from '@/lib/use-lite-mode';
 
 type ToastVariant = 'success' | 'error' | 'info';
 
@@ -34,7 +35,17 @@ const variantClasses: Record<ToastVariant, string> = {
   info: 'border-white/15 bg-white/10 text-white',
 };
 
+const createToastId = () => {
+  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const liteMode = useLiteMode(!!reduceMotion);
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
   const timersRef = useRef<Map<string, number>>(new Map());
 
@@ -48,7 +59,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const pushToast = useCallback((toast: ToastInput) => {
-      const id = crypto.randomUUID();
+      const id = createToastId();
       setToasts((current) => [...current, { id, variant: 'info', ...toast }]);
       const timer = window.setTimeout(() => removeToast(id), 3200);
       timersRef.current.set(id, timer);
@@ -69,7 +80,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               initial={{ opacity: 0, y: -12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+              transition={{ duration: liteMode ? 0.01 : 0.18 }}
               className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl ${variantClasses[toast.variant || 'info']}`}
             >
               <div className="flex items-start gap-3">

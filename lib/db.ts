@@ -480,18 +480,20 @@ export const getProfileAnalytics = async (username: string): Promise<ProfileAnal
   fourteenDaysAgo.setHours(0, 0, 0, 0);
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
 
-  const [profile, clickEvents, viewEvents, recentViews] = await Promise.all([
+  const [profile, clickGroups, referrerGroups, recentViews] = await Promise.all([
     prisma.profile.findUnique({
       where: { username: normalizedUsername },
       select: { views: true },
     }),
-    prisma.socialClickEvent.findMany({
+    prisma.socialClickEvent.groupBy({
+      by: ['platform'],
       where: { username: normalizedUsername },
-      select: { platform: true },
+      _count: { _all: true },
     }),
-    prisma.profileViewEvent.findMany({
+    prisma.profileViewEvent.groupBy({
+      by: ['referrerHost'],
       where: { username: normalizedUsername },
-      select: { referrerHost: true },
+      _count: { _all: true },
     }),
     prisma.profileViewEvent.findMany({
       where: {
@@ -505,15 +507,15 @@ export const getProfileAnalytics = async (username: string): Promise<ProfileAnal
   ]);
 
   const clicksByPlatformMap = new Map<string, number>();
-  for (const event of clickEvents) {
-    const key = event.platform || 'unknown';
-    clicksByPlatformMap.set(key, (clicksByPlatformMap.get(key) || 0) + 1);
+  for (const group of clickGroups) {
+    const key = group.platform || 'unknown';
+    clicksByPlatformMap.set(key, group._count._all);
   }
 
   const referrerMap = new Map<string, number>();
-  for (const event of viewEvents) {
-    const key = event.referrerHost || 'direct';
-    referrerMap.set(key, (referrerMap.get(key) || 0) + 1);
+  for (const group of referrerGroups) {
+    const key = group.referrerHost || 'direct';
+    referrerMap.set(key, group._count._all);
   }
 
   const viewsByDayMap = new Map<string, number>();
@@ -531,7 +533,7 @@ export const getProfileAnalytics = async (username: string): Promise<ProfileAnal
   }
 
   const totalViews = profile?.views || 0;
-  const totalClicks = clickEvents.length;
+  const totalClicks = Array.from(clicksByPlatformMap.values()).reduce((sum, count) => sum + count, 0);
 
   return {
     totalViews,
