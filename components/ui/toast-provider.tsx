@@ -46,6 +46,10 @@ const createToastId = () => {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
   const liteMode = useLiteMode(!!reduceMotion);
+  const toastTransition = liteMode
+    ? { duration: 0.01 }
+    : { duration: 0.16, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+  const toastOffset = liteMode ? 0 : 6;
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
   const timersRef = useRef<Map<string, number>>(new Map());
 
@@ -77,10 +81,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((toast) => (
             <motion.div
               key={toast.id}
-              initial={{ opacity: 0, y: -12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: liteMode ? 0.01 : 0.18 }}
+              initial={{ opacity: 0, y: -toastOffset }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -toastOffset }}
+              transition={toastTransition}
               className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl ${variantClasses[toast.variant || 'info']}`}
             >
               <div className="flex items-start gap-3">

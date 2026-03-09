@@ -89,6 +89,7 @@ interface DashboardClientProps {
   initialUsername: string;
   initialProfile: UserProfile;
   initialAnalytics: ProfileAnalytics;
+  publicProfileUrl: string;
 }
 
 const SOCIAL_PRESETS = [
@@ -432,10 +433,15 @@ export default function DashboardClient({
   initialUsername,
   initialProfile,
   initialAnalytics,
+  publicProfileUrl,
 }: DashboardClientProps) {
   const router = useRouter();
   const { pushToast } = useToast();
   const liteMode = useLiteMode();
+  const sectionTransition = liteMode
+    ? { duration: 0.01 }
+    : { duration: 0.16, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
+  const sectionOffset = liteMode ? 0 : 6;
 
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [copied, setCopied] = useState(false);
@@ -482,8 +488,7 @@ export default function DashboardClient({
   });
   const backgroundCropResolver = useRef<((file: File | null) => void) | null>(null);
 
-  const origin = useMemo(() => (typeof window === 'undefined' ? '' : window.location.origin), []);
-  const profileUrl = useMemo(() => (user ? `${origin}/${user.username}` : ''), [origin, user]);
+  const profileUrl = publicProfileUrl;
 
   const resolveAvatarCrop = useCallback((file: File | null) => {
     if (avatarCropResolver.current) {
@@ -1145,10 +1150,10 @@ export default function DashboardClient({
               {section !== 'links' ? (
                 <motion.div
                   key={section}
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: sectionOffset }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: liteMode ? 0.01 : 0.18 }}
+                  exit={{ opacity: 0, y: -sectionOffset }}
+                  transition={sectionTransition}
                   className="space-y-4"
                 >
                   {section === 'overview' && (
@@ -1339,10 +1344,10 @@ export default function DashboardClient({
               ) : (
                 <motion.div
                   key="links"
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: sectionOffset }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: liteMode ? 0.01 : 0.18 }}
+                  exit={{ opacity: 0, y: -sectionOffset }}
+                  transition={sectionTransition}
                   className="space-y-4"
                 >
                   <Panel title="Add social links" description="Start with the platforms people already expect to find.">

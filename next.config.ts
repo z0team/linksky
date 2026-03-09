@@ -1,14 +1,27 @@
 import type { NextConfig } from 'next';
 
+const cloudflareScriptSources = [
+  'https://*.cloudflare.com',
+  'https://*.cloudflareinsights.com',
+];
+
+const cloudflareConnectSources = [
+  'https://*.cloudflare.com',
+  'https://cloudflareinsights.com',
+  'https://*.cloudflareinsights.com',
+];
+
+const cloudflareFrameSources = ['https://*.cloudflare.com'];
+
 const csp = [
   "default-src 'self'",
   "img-src 'self' data: blob:",
   "media-src 'self' blob: data:",
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-  "connect-src 'self'",
+  `script-src 'self' 'unsafe-eval' 'unsafe-inline' ${cloudflareScriptSources.join(' ')}`,
+  `connect-src 'self' ${cloudflareConnectSources.join(' ')}`,
   "font-src 'self' data:",
-  "frame-src 'self'",
+  `frame-src 'self' ${cloudflareFrameSources.join(' ')}`,
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",

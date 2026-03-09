@@ -207,9 +207,10 @@ export default function ProfileClient({
 
   const socials = useMemo(() => normalizeSocials(profile.socials), [profile.socials]);
 
+  const revealDistance = liteMode ? 0 : 10;
   const contentTransition = liteMode
     ? { duration: 0.01 }
-    : { duration: 0.45, delay: 0.08, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] };
+    : { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
   const isEntered = previewMode || entered;
   const shouldRenderVideoBackground = Boolean(isVideoBg && isEntered && !liteMode);
 
@@ -249,13 +250,14 @@ export default function ProfileClient({
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={liteMode ? { duration: 0.01 } : { duration: 0.45 }}
+            transition={contentTransition}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-[2px] cursor-pointer px-4"
             onClick={handleEnter}
           >
             <motion.p
-              animate={liteMode ? { opacity: 1 } : { opacity: [0.5, 1, 0.5] }}
-              transition={liteMode ? { duration: 0 } : { repeat: Infinity, duration: 2 }}
+              initial={{ opacity: 0, y: revealDistance }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={contentTransition}
               className="text-lg sm:text-2xl font-light tracking-[0.25em] text-center"
             >
               {profile.enterText || '[ click to enter ]'}
@@ -267,8 +269,8 @@ export default function ProfileClient({
       <AnimatePresence>
         {isEntered && (
           <motion.div
-              initial={{ opacity: 0, scale: liteMode ? 1 : 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: revealDistance }}
+              animate={{ opacity: 1, y: 0 }}
               transition={contentTransition}
             className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-10"
           >
@@ -282,9 +284,9 @@ export default function ProfileClient({
             >
               <div className="flex flex-col items-center">
                 <motion.div
-                  initial={{ scale: liteMode ? 1 : 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={liteMode ? { duration: 0.01 } : { type: 'spring', delay: 0.15 }}
+                  initial={{ opacity: 0, y: revealDistance }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...contentTransition, delay: liteMode ? 0 : 0.04 }}
                   className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2"
                   style={{ borderColor: `${accentColor}80`, boxShadow: profile.enableGlow ? `0 0 28px ${accentColor}66` : 'none' }}
                 >
@@ -300,9 +302,9 @@ export default function ProfileClient({
                 </motion.div>
 
                 <motion.h1
-                  initial={{ y: 8, opacity: 0 }}
+                  initial={{ y: revealDistance, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={liteMode ? { duration: 0.01 } : { delay: 0.24 }}
+                  transition={{ ...contentTransition, delay: liteMode ? 0 : 0.08 }}
                   className="mt-5 sm:mt-6 text-xl sm:text-2xl font-semibold text-white/95 tracking-wide text-center break-words"
                 >
                   {profile.displayName || username}
@@ -319,9 +321,9 @@ export default function ProfileClient({
 
                 {!!socials.length && (
                   <motion.div
-                    initial={{ y: 8, opacity: 0 }}
+                    initial={{ y: revealDistance, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={liteMode ? { duration: 0.01 } : { delay: 0.35 }}
+                    transition={{ ...contentTransition, delay: liteMode ? 0 : 0.12 }}
                     className="flex items-center justify-center gap-4 sm:gap-6 mt-6 sm:mt-8 flex-wrap"
                   >
                     {socials.map((social) => {
@@ -355,9 +357,9 @@ export default function ProfileClient({
 
             {profile.musicUrl && (
               <motion.div
-                initial={{ y: 16, opacity: 0 }}
+                initial={{ y: revealDistance, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={liteMode ? { duration: 0.01 } : { delay: 0.4 }}
+                transition={{ ...contentTransition, delay: liteMode ? 0 : 0.16 }}
                 className="w-full max-w-[92vw] sm:max-w-[520px] mt-4 border border-white/10 rounded-3xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-lg"
                 style={{
                   backgroundColor: `rgba(0,0,0,${Math.min(cardOpacity + 0.05, 0.95)})`,
@@ -405,10 +407,10 @@ export default function ProfileClient({
       <AnimatePresence>
         {isEntered && !previewMode && showPromoBanner && (
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: liteMode ? 1 : 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={liteMode ? { duration: 0.01 } : { duration: 0.28 }}
+            initial={{ opacity: 0, y: revealDistance }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: revealDistance }}
+            transition={contentTransition}
             className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,480px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[rgba(8,12,22,0.76)] px-4 py-3 shadow-[0_14px_34px_rgba(0,0,0,0.38)] backdrop-blur-xl"
           >
             <button

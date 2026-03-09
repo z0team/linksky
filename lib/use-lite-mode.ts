@@ -29,7 +29,7 @@ const getLiteModeState = (forceLiteMode = false) => {
 };
 
 export function useLiteMode(forceLiteMode = false) {
-  const [liteMode, setLiteMode] = useState(() => getLiteModeState(forceLiteMode));
+  const [liteMode, setLiteMode] = useState(forceLiteMode);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

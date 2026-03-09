@@ -54,9 +54,9 @@ export default function Login() {
       </Link>
 
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.45 }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.045] p-6 sm:p-8 backdrop-blur-2xl relative z-10 shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
       >
         <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-neutral-300 mb-4">

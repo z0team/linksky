@@ -44,10 +44,10 @@ export default function LandingClient({
     .trim()
     .charAt(0)
     .toUpperCase();
-
-  const floatTransition = liteMode
-    ? { duration: 0 }
-    : { duration: 20, repeat: Infinity, ease: 'easeInOut' as const, repeatType: 'reverse' as const };
+  const revealDistance = liteMode ? 0 : 10;
+  const revealTransition = liteMode
+    ? { duration: 0.01 }
+    : { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -72,30 +72,24 @@ export default function LandingClient({
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+      transition: {
+        staggerChildren: liteMode ? 0 : 0.06,
+        delayChildren: liteMode ? 0 : 0.04,
+      },
+    },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+    hidden: { opacity: 0, y: revealDistance },
+    show: { opacity: 1, y: 0, transition: revealTransition },
   };
 
   return (
     <div className="relative min-h-screen selection:bg-white/20 selection:text-white overflow-hidden bg-[#050507] text-white font-sans">
       {/* Dynamic Background */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* Animated glowing orbs */}
-        <motion.div
-          animate={liteMode ? undefined : { x: [-30, 30, -30], y: [-30, 30, -30], scale: [1, 1.1, 1] }}
-          transition={floatTransition}
-          className={`absolute -left-32 top-[-20%] rounded-full bg-gradient-to-br from-[#ff8f4d]/10 to-[#ff4d4d]/5 ${liteMode ? 'h-[360px] w-[360px] blur-[70px]' : 'h-[600px] w-[600px] blur-[120px]'}`}
-        />
-        <motion.div
-          animate={liteMode ? undefined : { x: [30, -30, 30], y: [30, -30, 30], scale: [1, 1.2, 1] }}
-          transition={{ ...floatTransition, duration: 25 }}
-          className={`absolute right-[-20%] top-[10%] rounded-full bg-gradient-to-bl from-[#4f82ff]/10 to-[#9b4dff]/5 ${liteMode ? 'h-[420px] w-[420px] blur-[80px]' : 'h-[700px] w-[700px] blur-[150px]'}`}
-        />
+        <div className="absolute -left-32 top-[-20%] h-[420px] w-[420px] rounded-full bg-gradient-to-br from-[#ff8f4d]/10 to-[#ff4d4d]/5 blur-[90px] sm:h-[520px] sm:w-[520px] sm:blur-[110px]" />
+        <div className="absolute right-[-20%] top-[10%] h-[480px] w-[480px] rounded-full bg-gradient-to-bl from-[#4f82ff]/10 to-[#9b4dff]/5 blur-[100px] sm:h-[620px] sm:w-[620px] sm:blur-[130px]" />
         {/* Subtle grid texture overlay */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-[0.08]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.03),transparent_50%),linear-gradient(180deg,#050507_0%,#080a10_50%,#050507_100%)]" />
@@ -104,9 +98,9 @@ export default function LandingClient({
       <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-6 pb-20 pt-6 lg:px-12">
         {/* Navigation */}
         <motion.nav 
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -revealDistance }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={revealTransition}
           className="flex items-center justify-between rounded-full border border-white/5 bg-white/[0.02] px-4 py-3 shadow-2xl backdrop-blur-2xl transition-all hover:bg-white/[0.04]"
         >
           <Link href="/" className="group flex items-center gap-3">
@@ -159,9 +153,9 @@ export default function LandingClient({
           <section className="mx-auto w-full max-w-5xl">
             <div className="mx-auto max-w-4xl text-center">
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
+                initial={{ opacity: 0, y: revealDistance }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={revealTransition}
                 className="inline-flex items-center gap-2 rounded-full border border-[#ffcf8d]/20 bg-[#ffcf8d]/10 px-4 py-1.5 text-xs font-medium text-[#ffd08d] backdrop-blur-md"
               >
                 <Sparkles size={14} />
@@ -169,9 +163,9 @@ export default function LandingClient({
               </motion.div>
 
               <motion.h1
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: revealDistance }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ ...revealTransition, delay: liteMode ? 0 : 0.04 }}
                 className="mt-8 text-[3.5rem] font-extrabold leading-[1.05] tracking-tight sm:text-[4.5rem] lg:text-[5.5rem]"
               >
                 <span className="bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
@@ -184,18 +178,18 @@ export default function LandingClient({
               </motion.h1>
 
               <motion.p
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: revealDistance }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ ...revealTransition, delay: liteMode ? 0 : 0.08 }}
                 className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/50 sm:text-xl"
               >
                 LinkSky keeps your avatar, links, background and music in one clean page that stays readable on both desktop and mobile.
               </motion.p>
 
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: revealDistance }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ ...revealTransition, delay: liteMode ? 0 : 0.12 }}
                 className="mt-10 flex flex-wrap items-center justify-center gap-4"
               >
                 <Link href={primaryHref} className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-white px-8 py-4 text-base font-bold text-black transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]">
@@ -233,28 +227,28 @@ export default function LandingClient({
               icon={<Zap size={22} />}
               title="Simple editing"
               description="The dashboard focuses on the basics first: media, profile, appearance and links."
-              motionEnabled={!liteMode}
+              motionEnabled={false}
             />
             <FeatureCard
               icon={<Music size={22} />}
               title="Personal styling"
               description="Add a background, a track and a few visual details without turning the page into a mess."
-              motionEnabled={!liteMode}
+              motionEnabled={false}
             />
             <FeatureCard
               icon={<BarChart3 size={22} />}
               title="Useful stats"
               description="Views, clicks and referral data are available without leaving the app."
-              motionEnabled={!liteMode}
+              motionEnabled={false}
             />
           </motion.section>
 
           {/* Workflow Section */}
           <motion.section 
-            initial={{ opacity: 0, y: 40 }}
+            initial={{ opacity: 0, y: revealDistance }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: liteMode ? '0px' : '-100px' }}
-            transition={{ duration: liteMode ? 0.01 : 0.7 }}
+            transition={revealTransition}
             className="mt-32 relative overflow-hidden rounded-[40px] border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-8 backdrop-blur-2xl sm:p-12 [content-visibility:auto] [contain-intrinsic-size:760px]"
           >
             <div className="absolute top-0 left-1/2 h-[1px] w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -271,29 +265,29 @@ export default function LandingClient({
                 step="01"
                 title="Pick your username"
                 text="Start with a short profile URL you can reuse across every platform."
-                motionEnabled={!liteMode}
+                motionEnabled={false}
               />
               <WorkflowCard
                 step="02"
                 title="Add what matters"
                 text="Upload your media, write a short intro and keep only the links worth clicking."
-                motionEnabled={!liteMode}
+                motionEnabled={false}
               />
               <WorkflowCard
                 step="03"
                 title="Publish & update"
                 text="Open the dashboard later, change what you need and keep the same public link."
-                motionEnabled={!liteMode}
+                motionEnabled={false}
               />
             </div>
           </motion.section>
 
           {/* CTA Section */}
           <motion.section 
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, y: revealDistance }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: liteMode ? '0px' : '-50px' }}
-            transition={{ duration: liteMode ? 0.01 : 0.6 }}
+            transition={revealTransition}
             className="mt-32 relative overflow-hidden rounded-[40px] border border-white/10 bg-gradient-to-b from-[#0c111d] to-[#070b14] px-6 py-20 text-center shadow-[0_30px_100px_rgba(0,0,0,0.5)] sm:px-12 [content-visibility:auto] [contain-intrinsic-size:620px]"
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_42%),radial-gradient(circle_at_bottom,rgba(79,130,255,0.08),transparent_48%)] opacity-70" />
@@ -316,7 +310,7 @@ export default function LandingClient({
         </main>
 
         <footer className="mt-16 border-t border-white/5 pt-8 text-center text-sm font-medium text-white/30">
-          <p>Copyright {new Date().getFullYear()} LinkSky. Built for creators.</p>
+          <p>Copyright {new Date().getUTCFullYear()} LinkSky. Built for creators.</p>
         </footer>
       </div>
     </div>
