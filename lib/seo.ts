@@ -1,6 +1,6 @@
 export const SITE_NAME = 'LinkSky';
 export const SITE_DESCRIPTION =
-  'LinkSky is a fast profile and bio link builder for creators.';
+  'LinkSky is a design-led profile and link page builder for creators, gamers, and internet-native identities.';
 
 const DEFAULT_SITE_URL = 'http://localhost:3000';
 

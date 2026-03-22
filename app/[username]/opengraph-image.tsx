@@ -18,7 +18,7 @@ export default async function OpenGraphImage({
   const user = await getUserByUsername(username);
   const profile = user?.profile;
   const displayName = profile?.displayName?.trim() || username;
-  const bio = profile?.bio?.trim() || 'Build a custom profile page with music, links and motion.';
+  const bio = profile?.bio?.trim() || 'Custom profile page with links, media, and a more intentional public presence.';
   const accentColor = profile?.accentColor?.trim() || '#8ea7ff';
   const avatarUrl = profile?.avatarUrl?.trim() || '';
   const backgroundUrl = profile?.backgroundUrl?.trim() || '';
@@ -112,7 +112,7 @@ export default async function OpenGraphImage({
                   boxShadow: `0 0 24px ${accentColor}`,
                 }}
               />
-              links, media, profile vibes
+              links, media, page identity
             </div>
           </div>
           <div

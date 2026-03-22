@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { incrementProfileViews, recordProfileViewEvent } from '@/lib/db';
+import { incrementProfileViews, recordProfileViewEvent, userExistsByUsername } from '@/lib/db';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { getClientIp, getReferrerHost } from '@/lib/request';
+import { usernameSchema } from '@/lib/validation';
+import { ZodError } from 'zod';
 
 const VIEW_COOLDOWN_SECONDS = 60;
 
@@ -15,18 +17,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ usernam
     }
 
     const { username } = await params;
+    const parsedUsername = usernameSchema.parse(username);
+    const userExists = await userExistsByUsername(parsedUsername);
+    if (!userExists) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const cookieStore = await cookies();
-    const marker = `viewed_${username}`;
+    const marker = `viewed_${parsedUsername}`;
     const alreadyCounted = cookieStore.get(marker)?.value === '1';
 
     if (!alreadyCounted) {
       await Promise.all([
-        incrementProfileViews(username),
-        recordProfileViewEvent(username, getReferrerHost(req)),
+        incrementProfileViews(parsedUsername),
+        recordProfileViewEvent(parsedUsername, getReferrerHost(req)),
       ]);
 
       cookieStore.set(marker, '1', {
-        path: '/',
+        path: `/api/users/${parsedUsername}/view`,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
@@ -35,7 +43,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ usernam
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.issues[0]?.message || 'Invalid request' }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

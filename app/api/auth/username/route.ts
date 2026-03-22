@@ -18,7 +18,14 @@ export async function GET(req: Request) {
     const parsed = usernameAvailabilitySchema.parse({ username });
     const existingUser = await getUserByUsername(parsed.username);
 
-    return NextResponse.json({ available: !existingUser });
+    return NextResponse.json(
+      { available: !existingUser },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=15, stale-while-revalidate=120',
+        },
+      },
+    );
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: error.issues[0]?.message || 'Invalid username' }, { status: 400 });

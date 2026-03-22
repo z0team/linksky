@@ -18,19 +18,19 @@ const csp = [
   "img-src 'self' data: blob:",
   "media-src 'self' blob: data:",
   "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-eval' 'unsafe-inline' ${cloudflareScriptSources.join(' ')}`,
+  `script-src 'self' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval' " : ''}'unsafe-inline' ${cloudflareScriptSources.join(' ')}`,
   `connect-src 'self' ${cloudflareConnectSources.join(' ')}`,
   "font-src 'self' data:",
   `frame-src 'self' ${cloudflareFrameSources.join(' ')}`,
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",
+  "object-src 'none'",
 ].join('; ');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  allowedDevOrigins: ['*'],
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -38,7 +38,16 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    remotePatterns: [],
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+      },
+    ],
+  },
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
   },
   output: 'standalone',
   async headers() {

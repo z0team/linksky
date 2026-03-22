@@ -58,7 +58,7 @@ export function TabButton({
       className={`group relative flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
         active
           ? 'bg-[var(--accent-soft)] text-white shadow-[0_10px_24px_var(--accent-glow)]'
-          : 'bg-transparent text-neutral-300 hover:bg-white/[0.045] hover:text-white'
+          : 'bg-transparent text-[color:var(--text-secondary)] hover:bg-white/[0.045] hover:text-white'
       }`}
     >
       <span className={`absolute inset-y-2 left-0 w-[3px] rounded-r-full transition-opacity duration-200 ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`} style={{ background: 'var(--accent)' }} />
@@ -80,11 +80,11 @@ export function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(14,20,34,0.94),rgba(12,18,31,0.9))] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl md:p-5">
+    <section className="linksky-panel rounded-[28px] p-4 md:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white md:text-2xl">{title}</h2>
-          {description ? <p className="mt-1 text-sm leading-6 text-neutral-400">{description}</p> : null}
+          <h2 className="font-display text-xl font-semibold tracking-[-0.03em] text-white md:text-2xl">{title}</h2>
+          {description ? <p className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">{description}</p> : null}
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
@@ -250,7 +250,6 @@ export function MediaCard({
               fill
               sizes="(max-width: 640px) 100vw, 25vw"
               className={isCursor ? 'object-contain p-3' : 'object-cover'}
-              unoptimized
               onError={() => setImageFailed(true)}
             />
           ) : showVideo ? (
@@ -297,7 +296,7 @@ export function Input({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-2xl bg-[#0b1220] border border-[#273247] px-3.5 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
+        className="linksky-input text-sm"
       />
     </div>
   );
@@ -318,7 +317,7 @@ export function Toggle({
     <button
       onClick={() => onToggle(!value)}
       className={`w-full rounded-2xl border px-3 py-2.5 text-sm font-medium inline-flex items-center justify-between transition-all duration-200 ${
-        value ? 'border-emerald-400/45 bg-emerald-500/12 text-emerald-200 shadow-[0_10px_22px_rgba(16,185,129,0.18)]' : 'border-[#2b3548] bg-[#0f1627]/85 text-neutral-300 hover:border-[#3a4a62]'
+        value ? 'border-emerald-400/45 bg-emerald-500/12 text-emerald-200 shadow-[0_10px_22px_rgba(16,185,129,0.18)]' : 'border-white/10 bg-[rgba(8,11,16,0.56)] text-[color:var(--text-secondary)] hover:border-white/16'
       }`}
     >
       <span className="inline-flex items-center gap-2">{icon} {label}</span>
@@ -350,7 +349,7 @@ export function RangeRow({
     <div>
       <label htmlFor={inputId} className="mb-2 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-neutral-400"><SlidersHorizontal size={14} /> {label}</label>
       <input id={inputId} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[var(--accent)]" />
-      <div className="text-xs text-neutral-500 mt-1">{value}</div>
+      <div className="mt-1 text-xs text-[color:var(--text-muted)]">{value}</div>
     </div>
   );
 }

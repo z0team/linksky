@@ -23,7 +23,7 @@ export async function GET(
     const headers = new Headers({
       'Content-Type': object.ContentType || 'application/octet-stream',
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'private, max-age=0, must-revalidate',
+      'Cache-Control': 'public, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
     });
     if (object.ContentLength != null) {

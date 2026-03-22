@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { consumeRateLimit } from '@/lib/rate-limit';
-import { recordSocialClickEvent } from '@/lib/db';
+import { recordSocialClickEvent, userExistsByUsername } from '@/lib/db';
 import { getClientIp, getReferrerHost } from '@/lib/request';
-import { socialClickSchema } from '@/lib/validation';
+import { socialClickSchema, usernameSchema } from '@/lib/validation';
 import { ZodError } from 'zod';
 
 export async function POST(req: Request, { params }: { params: Promise<{ username: string }> }) {
@@ -14,10 +14,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ usernam
     }
 
     const { username } = await params;
+    const parsedUsername = usernameSchema.parse(username);
+    const userExists = await userExistsByUsername(parsedUsername);
+    if (!userExists) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const payload = socialClickSchema.parse(await req.json());
 
     await recordSocialClickEvent({
-      username,
+      username: parsedUsername,
       platform: payload.platform,
       url: payload.url,
       referrerHost: getReferrerHost(req),

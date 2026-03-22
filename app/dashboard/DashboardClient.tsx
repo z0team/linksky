@@ -1,43 +1,43 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AnimatePresence, motion } from 'motion/react';
 import { type Area } from 'react-easy-crop';
 import {
-  Sparkles,
-  LogOut,
-  Loader2,
-  Copy,
-  ExternalLink,
-  RotateCcw,
-  ChevronUp,
+  Activity,
+  BadgeCheck,
+  BarChart3,
+  CheckCircle2,
   ChevronDown,
+  ChevronUp,
+  Copy,
+  Disc3,
+  ExternalLink,
+  Facebook,
+  Github,
+  Globe,
+  GripVertical,
+  Image as ImageIcon,
+  Instagram,
+  Link as LinkIcon,
+  Loader2,
+  LogOut,
+  MousePointer2,
+  Music,
+  Palette,
+  Plus,
+  RotateCcw,
+  Send,
+  Sparkles,
+  Trash2,
+  Twitch,
+  User,
+  Youtube,
+  Linkedin,
   Eye,
   EyeOff,
-  Plus,
-  Trash2,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  Music,
-  MousePointer2,
-  Send,
-  Github,
-  Instagram,
-  Youtube,
-  Twitch,
-  Linkedin,
-  Facebook,
-  Globe,
-  Disc3,
-  User,
-  BadgeCheck,
-  GripVertical,
-  BarChart3,
-  Activity,
-  CheckCircle2,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-provider';
 import type { ProfileAnalytics, SocialLink, UserProfile } from '@/lib/db';
@@ -45,8 +45,8 @@ import { useLiteMode } from '@/lib/use-lite-mode';
 import { AnalyticsOverview } from './dashboard-analytics';
 import {
   AvatarCropModal,
-  ConfirmDialog,
   BackgroundCropModal,
+  ConfirmDialog,
   Input,
   MediaCard,
   Panel,
@@ -55,7 +55,7 @@ import {
   Toggle,
 } from './dashboard-ui';
 
-type Section = 'overview' | 'media' | 'profile' | 'appearance' | 'links';
+type Section = 'studio' | 'content' | 'theme' | 'links' | 'insights';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface ProfileForm {
@@ -128,16 +128,18 @@ const makeId = () => {
   return `${Date.now()}-${Math.random()}`;
 };
 
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
 const withAlpha = (hex: string, alpha: number) => {
   const raw = hex.replace('#', '').trim();
-  if (!/^[\da-fA-F]{6}$/.test(raw)) return `rgba(142, 167, 255, ${alpha})`;
+  if (!/^[\da-fA-F]{6}$/.test(raw)) return `rgba(125, 192, 255, ${alpha})`;
 
   const r = parseInt(raw.slice(0, 2), 16);
   const g = parseInt(raw.slice(2, 4), 16);
   const b = parseInt(raw.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
+
 const fileNameToTrackTitle = (fileName: string) => {
   const withoutExtension = fileName.replace(/\.[^/.]+$/, '');
   return withoutExtension.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -149,6 +151,44 @@ const AVATAR_TARGET_SIZE = 720;
 const BACKGROUND_TARGET_WIDTH = 1600;
 const BACKGROUND_TARGET_HEIGHT = 900;
 const AUTO_SAVE_DELAY_MS = 800;
+const QUICK_COLORS = ['#7dc0ff', '#f19371', '#78cfbf', '#d8b1ff', '#f2c39a'];
+const SECTION_ITEMS = [
+  { id: 'studio' as Section, label: 'Studio', mobileLabel: 'Studio', icon: Sparkles },
+  { id: 'content' as Section, label: 'Content', mobileLabel: 'Content', icon: User },
+  { id: 'theme' as Section, label: 'Theme', mobileLabel: 'Theme', icon: Palette },
+  { id: 'links' as Section, label: 'Links', mobileLabel: 'Links', icon: LinkIcon },
+  { id: 'insights' as Section, label: 'Insights', mobileLabel: 'Stats', icon: BarChart3 },
+];
+const SECTION_META: Record<
+  Section,
+  { title: string; description: string; eyebrow: string }
+> = {
+  studio: {
+    eyebrow: 'Control room',
+    title: 'See what is ready, what is missing, and what to share next.',
+    description: 'Use this as the overview: page health, quick actions, and the current public URL.',
+  },
+  content: {
+    eyebrow: 'Content',
+    title: 'Edit the parts people actually read first.',
+    description: 'Name, bio, status, location, entry text, and the media that shape the page.',
+  },
+  theme: {
+    eyebrow: 'Theme',
+    title: 'Shape the atmosphere without losing clarity.',
+    description: 'Accent, font, panel treatment, and view behavior all live here.',
+  },
+  links: {
+    eyebrow: 'Links',
+    title: 'Choose where people should click.',
+    description: 'Start with the platforms you want to be known for, then order them the way you want them seen.',
+  },
+  insights: {
+    eyebrow: 'Insights',
+    title: 'Check what people opened and where they came from.',
+    description: 'Views, clicks, CTR, referrers, and platform performance for the current page.',
+  },
+};
 
 const loadImageFromUrl = (url: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -170,9 +210,7 @@ const canvasToBlob = (
     }, type, quality);
   });
 
-const replaceExt = (name: string, ext: string) => {
-  return name.replace(/\.[^/.]+$/, '') + ext;
-};
+const replaceExt = (name: string, ext: string) => name.replace(/\.[^/.]+$/, '') + ext;
 
 const getCenteredAspectCrop = (croppedAreaPixels: Area, aspect: number) => {
   const width = Math.max(1, croppedAreaPixels.width);
@@ -273,7 +311,8 @@ const createAvatarCropFile = async (
 
   const outputType = /image\/(png|webp)/i.test(mimeType) ? mimeType : 'image/jpeg';
   const blob = await canvasToBlob(canvas, outputType, 0.92);
-  const ext = outputType === 'image/png' ? '.png' : outputType === 'image/webp' ? '.webp' : '.jpg';
+  const ext =
+    outputType === 'image/png' ? '.png' : outputType === 'image/webp' ? '.webp' : '.jpg';
   return new File([blob], replaceExt(fileName || 'avatar', ext), {
     type: outputType,
     lastModified: Date.now(),
@@ -310,7 +349,8 @@ const createBackgroundCropFile = async (
 
   const outputType = /image\/(png|webp)/i.test(mimeType) ? mimeType : 'image/jpeg';
   const blob = await canvasToBlob(canvas, outputType, 0.92);
-  const ext = outputType === 'image/png' ? '.png' : outputType === 'image/webp' ? '.webp' : '.jpg';
+  const ext =
+    outputType === 'image/png' ? '.png' : outputType === 'image/webp' ? '.webp' : '.jpg';
   return new File([blob], replaceExt(fileName || 'background', ext), {
     type: outputType,
     lastModified: Date.now(),
@@ -343,8 +383,8 @@ const normalizeSocialsInput = (value: unknown): SocialLink[] => {
   return [];
 };
 
-const toSocialFormItems = (socials: unknown): SocialFormItem[] => {
-  return normalizeSocialsInput(socials).map((item) => {
+const toSocialFormItems = (socials: unknown): SocialFormItem[] =>
+  normalizeSocialsInput(socials).map((item) => {
     const known = SOCIAL_PRESETS.includes(item.platform);
     return {
       id: makeId(),
@@ -353,7 +393,6 @@ const toSocialFormItems = (socials: unknown): SocialFormItem[] => {
       url: item.url,
     };
   });
-};
 
 const toProfileForm = (profile: Partial<UserProfile> | undefined): ProfileForm => {
   const source = profile || {};
@@ -369,7 +408,7 @@ const toProfileForm = (profile: Partial<UserProfile> | undefined): ProfileForm =
     cursorUrl: source.cursorUrl || '',
     songTitle: source.songTitle || '',
     enterText: source.enterText || '[ click to enter ]',
-    accentColor: source.accentColor || '#8ea7ff',
+    accentColor: source.accentColor || '#7dc0ff',
     cardOpacity: clamp(typeof source.cardOpacity === 'number' ? source.cardOpacity : 0.4, 0.2, 0.9),
     blurStrength: clamp(typeof source.blurStrength === 'number' ? source.blurStrength : 20, 0, 32),
     showViews: typeof source.showViews === 'boolean' ? source.showViews : true,
@@ -379,25 +418,24 @@ const toProfileForm = (profile: Partial<UserProfile> | undefined): ProfileForm =
   };
 };
 
-const buildSocialPayload = (items: SocialFormItem[]): SocialLink[] => {
-  return items
+const buildSocialPayload = (items: SocialFormItem[]): SocialLink[] =>
+  items
     .map((item) => {
-      const platform = (item.platform === 'custom' ? item.customPlatform : item.platform).trim().toLowerCase();
+      const platform = (item.platform === 'custom' ? item.customPlatform : item.platform)
+        .trim()
+        .toLowerCase();
       const url = item.url.trim();
       if (!platform || !url) return null;
       return { platform, url };
     })
     .filter((item): item is SocialLink => item !== null);
-};
 
-const buildProfilePayload = (nextFormData: ProfileForm, items: SocialFormItem[]) => {
-  return {
-    ...nextFormData,
-    cardOpacity: clamp(nextFormData.cardOpacity, 0.2, 0.9),
-    blurStrength: clamp(nextFormData.blurStrength, 0, 32),
-    socials: buildSocialPayload(items),
-  };
-};
+const buildProfilePayload = (nextFormData: ProfileForm, items: SocialFormItem[]) => ({
+  ...nextFormData,
+  cardOpacity: clamp(nextFormData.cardOpacity, 0.2, 0.9),
+  blurStrength: clamp(nextFormData.blurStrength, 0, 32),
+  socials: buildSocialPayload(items),
+});
 
 const moveItem = <T,>(items: T[], fromIndex: number, toIndex: number) => {
   if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return items;
@@ -438,32 +476,15 @@ export default function DashboardClient({
   const router = useRouter();
   const { pushToast } = useToast();
   const liteMode = useLiteMode();
-  const sectionTransition = liteMode
-    ? { duration: 0.01 }
-    : { duration: 0.16, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
-  const sectionOffset = liteMode ? 0 : 6;
-
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [copied, setCopied] = useState(false);
-  const [section, setSection] = useState<Section>('overview');
-  const [analytics] = useState<ProfileAnalytics>(initialAnalytics);
+  const [section, setSection] = useState<Section>('studio');
   const [draggedSocialId, setDraggedSocialId] = useState<string | null>(null);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [resettingProfile, setResettingProfile] = useState(false);
-  const sectionTopRef = useRef<HTMLDivElement | null>(null);
-  const didMountSectionRef = useRef(false);
-  const bioFieldId = useId();
-  const accentColorLabelId = useId();
-  const fontFamilyId = useId();
-
-  const user = useMemo(() => ({ username: initialUsername }), [initialUsername]);
   const [formData, setFormData] = useState<ProfileForm>(() => toProfileForm(initialProfile));
   const [socialItems, setSocialItems] = useState<SocialFormItem[]>(() =>
     toSocialFormItems(initialProfile?.socials),
-  );
-  const autosaveEnabledRef = useRef(false);
-  const lastSavedPayloadRef = useRef(
-    JSON.stringify(buildProfilePayload(toProfileForm(initialProfile), toSocialFormItems(initialProfile?.socials))),
   );
   const [avatarCrop, setAvatarCrop] = useState<AvatarCropState>({
     open: false,
@@ -475,7 +496,6 @@ export default function DashboardClient({
     zoom: 1,
     croppedAreaPixels: null,
   });
-  const avatarCropResolver = useRef<((file: File | null) => void) | null>(null);
   const [backgroundCrop, setBackgroundCrop] = useState<BackgroundCropState>({
     open: false,
     src: '',
@@ -486,54 +506,124 @@ export default function DashboardClient({
     zoom: 1,
     croppedAreaPixels: null,
   });
+  const avatarCropResolver = useRef<((file: File | null) => void) | null>(null);
   const backgroundCropResolver = useRef<((file: File | null) => void) | null>(null);
-
+  const autosaveEnabledRef = useRef(false);
+  const didMountSectionRef = useRef(false);
+  const inFlightPayloadRef = useRef<string | null>(null);
+  const lastSavedPayloadRef = useRef(
+    JSON.stringify(
+      buildProfilePayload(toProfileForm(initialProfile), toSocialFormItems(initialProfile?.socials)),
+    ),
+  );
+  const sectionTopRef = useRef<HTMLDivElement | null>(null);
+  const bioFieldId = useId();
+  const accentColorLabelId = useId();
+  const fontFamilyId = useId();
+  const analytics = initialAnalytics;
   const profileUrl = publicProfileUrl;
 
-  const resolveAvatarCrop = useCallback((file: File | null) => {
-    if (avatarCropResolver.current) {
-      avatarCropResolver.current(file);
-      avatarCropResolver.current = null;
-    }
+  const resolveAvatarCrop = useCallback(
+    (file: File | null) => {
+      if (avatarCropResolver.current) {
+        avatarCropResolver.current(file);
+        avatarCropResolver.current = null;
+      }
 
-    if (avatarCrop.src) {
-      URL.revokeObjectURL(avatarCrop.src);
-    }
+      if (avatarCrop.src) {
+        URL.revokeObjectURL(avatarCrop.src);
+      }
 
-    setAvatarCrop({
-      open: false,
-      src: '',
-      fileName: '',
-      mimeType: 'image/jpeg',
-      objectFit: 'cover',
-      crop: { x: 0, y: 0 },
-      zoom: 1,
-      croppedAreaPixels: null,
-    });
-  }, [avatarCrop.src]);
-
-  const requestAvatarCrop = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      pushToast({ title: 'Avatar must be an image', variant: 'error' });
-      return Promise.resolve<File | null>(null);
-    }
-
-    const src = URL.createObjectURL(file);
-
-    return new Promise<File | null>((resolve) => {
-      avatarCropResolver.current = resolve;
       setAvatarCrop({
-        open: true,
-        src,
-        fileName: file.name || 'avatar.jpg',
-        mimeType: file.type || 'image/jpeg',
+        open: false,
+        src: '',
+        fileName: '',
+        mimeType: 'image/jpeg',
         objectFit: 'cover',
         crop: { x: 0, y: 0 },
         zoom: 1,
         croppedAreaPixels: null,
       });
-    });
-  }, [pushToast]);
+    },
+    [avatarCrop.src],
+  );
+
+  const resolveBackgroundCrop = useCallback(
+    (file: File | null) => {
+      if (backgroundCropResolver.current) {
+        backgroundCropResolver.current(file);
+        backgroundCropResolver.current = null;
+      }
+
+      if (backgroundCrop.src) {
+        URL.revokeObjectURL(backgroundCrop.src);
+      }
+
+      setBackgroundCrop({
+        open: false,
+        src: '',
+        fileName: '',
+        mimeType: 'image/jpeg',
+        objectFit: 'cover',
+        crop: { x: 0, y: 0 },
+        zoom: 1,
+        croppedAreaPixels: null,
+      });
+    },
+    [backgroundCrop.src],
+  );
+
+  const requestAvatarCrop = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        pushToast({ title: 'Avatar must be an image', variant: 'error' });
+        return Promise.resolve<File | null>(null);
+      }
+
+      const src = URL.createObjectURL(file);
+
+      return new Promise<File | null>((resolve) => {
+        avatarCropResolver.current = resolve;
+        setAvatarCrop({
+          open: true,
+          src,
+          fileName: file.name || 'avatar.jpg',
+          mimeType: file.type || 'image/jpeg',
+          objectFit: 'cover',
+          crop: { x: 0, y: 0 },
+          zoom: 1,
+          croppedAreaPixels: null,
+        });
+      });
+    },
+    [pushToast],
+  );
+
+  const requestBackgroundCrop = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        pushToast({ title: 'Background must be an image', variant: 'error' });
+        return Promise.resolve<File | null>(null);
+      }
+
+      const src = URL.createObjectURL(file);
+
+      return new Promise<File | null>((resolve) => {
+        backgroundCropResolver.current = resolve;
+        setBackgroundCrop({
+          open: true,
+          src,
+          fileName: file.name || 'background.jpg',
+          mimeType: file.type || 'image/jpeg',
+          objectFit: 'cover',
+          crop: { x: 0, y: 0 },
+          zoom: 1,
+          croppedAreaPixels: null,
+        });
+      });
+    },
+    [pushToast],
+  );
 
   const handleConfirmAvatarCrop = useCallback(async () => {
     if (!avatarCrop.croppedAreaPixels || !avatarCrop.src) {
@@ -555,51 +645,6 @@ export default function DashboardClient({
     }
   }, [avatarCrop, pushToast, resolveAvatarCrop]);
 
-  const resolveBackgroundCrop = useCallback((file: File | null) => {
-    if (backgroundCropResolver.current) {
-      backgroundCropResolver.current(file);
-      backgroundCropResolver.current = null;
-    }
-
-    if (backgroundCrop.src) {
-      URL.revokeObjectURL(backgroundCrop.src);
-    }
-
-    setBackgroundCrop({
-      open: false,
-      src: '',
-      fileName: '',
-      mimeType: 'image/jpeg',
-      objectFit: 'cover',
-      crop: { x: 0, y: 0 },
-      zoom: 1,
-      croppedAreaPixels: null,
-    });
-  }, [backgroundCrop.src]);
-
-  const requestBackgroundCrop = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      pushToast({ title: 'Background must be an image', variant: 'error' });
-      return null;
-    }
-
-    const src = URL.createObjectURL(file);
-
-    return new Promise<File | null>((resolve) => {
-      backgroundCropResolver.current = resolve;
-      setBackgroundCrop({
-        open: true,
-        src,
-        fileName: file.name || 'background.jpg',
-        mimeType: file.type || 'image/jpeg',
-        objectFit: 'cover',
-        crop: { x: 0, y: 0 },
-        zoom: 1,
-        croppedAreaPixels: null,
-      });
-    });
-  }, [pushToast]);
-
   const handleConfirmBackgroundCrop = useCallback(async () => {
     if (!backgroundCrop.croppedAreaPixels || !backgroundCrop.src) {
       resolveBackgroundCrop(null);
@@ -620,41 +665,47 @@ export default function DashboardClient({
     }
   }, [backgroundCrop, pushToast, resolveBackgroundCrop]);
 
-  const transformCursorFile = useCallback(async (file: File) => {
-    const isCur = /\.cur$/i.test(file.name);
-    if (isCur) {
-      if (file.size > 512 * 1024) {
-        pushToast({
-          title: 'Cursor file is too large',
-          description: 'Keep .cur files under 512KB.',
-          variant: 'error',
-        });
-        return null;
+  const transformCursorFile = useCallback(
+    async (file: File) => {
+      const isCur = /\.cur$/i.test(file.name);
+      if (isCur) {
+        if (file.size > 512 * 1024) {
+          pushToast({
+            title: 'Cursor file is too large',
+            description: 'Keep .cur files under 512KB.',
+            variant: 'error',
+          });
+          return null;
+        }
+        return file;
       }
-      return file;
-    }
 
-    if (!file.type.startsWith('image/')) return file;
+      if (!file.type.startsWith('image/')) return file;
 
-    const resized = await resizeImageFileToMaxSide(
-      file,
-      CURSOR_MAX_SIDE,
-      CURSOR_TARGET_TYPE,
-    );
-
-    return resized;
-  }, [pushToast]);
+      return resizeImageFileToMaxSide(file, CURSOR_MAX_SIDE, CURSOR_TARGET_TYPE);
+    },
+    [pushToast],
+  );
 
   const persistProfile = useCallback(
     async (
       nextFormData: ProfileForm,
-      nextSocialItems: SocialFormItem[] = socialItems,
+      nextSocialItems: SocialFormItem[],
       opts?: { notifyOnError?: boolean; silent?: boolean },
     ) => {
+      const payload = buildProfilePayload(nextFormData, nextSocialItems);
+      const serialized = JSON.stringify(payload);
+
+      if (serialized === lastSavedPayloadRef.current || serialized === inFlightPayloadRef.current) {
+        if (!opts?.silent) {
+          setSaveState('saved');
+        }
+        return true;
+      }
+
+      inFlightPayloadRef.current = serialized;
       setSaveState('saving');
       try {
-        const payload = buildProfilePayload(nextFormData, nextSocialItems);
-
         const res = await fetch('/api/profile', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -663,7 +714,7 @@ export default function DashboardClient({
 
         if (!res.ok) throw new Error('Save failed');
         setFormData((prev) => ({ ...prev, socials: payload.socials }));
-        lastSavedPayloadRef.current = JSON.stringify(payload);
+        lastSavedPayloadRef.current = serialized;
         setSaveState('saved');
         if (!opts?.silent) {
           pushToast({ title: 'Changes saved', variant: 'success' });
@@ -675,20 +726,20 @@ export default function DashboardClient({
         }
         setSaveState('error');
         return false;
+      } finally {
+        inFlightPayloadRef.current = null;
       }
     },
-    [pushToast, socialItems],
+    [pushToast],
   );
 
   const updateMediaField = useCallback(
     (patch: Partial<ProfileForm>) => {
-      setFormData((prev) => {
-        const next = { ...prev, ...patch };
-        void persistProfile(next, socialItems, { notifyOnError: true, silent: true });
-        return next;
-      });
+      const next = { ...formData, ...patch };
+      setFormData(next);
+      void persistProfile(next, socialItems, { notifyOnError: true, silent: true });
     },
-    [persistProfile, socialItems],
+    [formData, persistProfile, socialItems],
   );
 
   const handleSave = async () => {
@@ -709,15 +760,11 @@ export default function DashboardClient({
     try {
       await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
+      window.setTimeout(() => setCopied(false), 1200);
       pushToast({ title: 'Profile URL copied', variant: 'success' });
     } catch {
       pushToast({ title: 'Copy failed', variant: 'error' });
     }
-  };
-
-  const resetLook = () => {
-    setResetConfirmOpen(true);
   };
 
   const confirmResetProfile = async () => {
@@ -729,11 +776,11 @@ export default function DashboardClient({
     if (saved) {
       setFormData(nextFormData);
       setSocialItems(nextSocialItems);
-      setSection('overview');
+      setSection('studio');
       setResetConfirmOpen(false);
       pushToast({
         title: 'Profile reset',
-        description: 'Media, links, text and styling were cleared.',
+        description: 'Media, links, text, and styling were cleared.',
         variant: 'success',
       });
     }
@@ -800,74 +847,6 @@ export default function DashboardClient({
 
     return () => window.clearTimeout(timeoutId);
   }, [formData, persistProfile, saveState, socialItems]);
-  const accentColor = formData.accentColor || '#8ea7ff';
-  const dashboardTheme = useMemo(
-    () =>
-      ({
-        '--accent': accentColor,
-        '--accent-soft': withAlpha(accentColor, 0.14),
-        '--accent-border': withAlpha(accentColor, 0.52),
-        '--accent-glow': withAlpha(accentColor, 0.28),
-        '--accent-shadow': withAlpha(accentColor, 0.38),
-      }) as React.CSSProperties,
-    [accentColor],
-  );
-  const hasBio = formData.bio.trim().length > 0;
-  const hasLinks = socialItems.some((item) => item.url.trim().length > 0);
-  const hasSong = formData.musicUrl.trim().length > 0;
-  const publishedLinksCount = socialItems.filter((item) => item.url.trim().length > 0).length;
-  const quickColors = ['#8ea7ff', '#60a5fa', '#34d399', '#f59e0b', '#f97316'];
-  const checklistItems = [
-    { label: 'Display name', done: formData.displayName.trim().length > 0 },
-    { label: 'Avatar', done: formData.avatarUrl.trim().length > 0 },
-    { label: 'Background', done: formData.backgroundUrl.trim().length > 0 },
-    { label: 'Bio', done: hasBio },
-    { label: 'Link', done: hasLinks },
-  ];
-  const completedChecklistCount = checklistItems.filter((item) => item.done).length;
-  const completionPercent = Math.round((completedChecklistCount / checklistItems.length) * 100);
-  const completionLabel =
-    completionPercent >= 80 ? 'Ready to share' : completionPercent >= 50 ? 'Almost there' : 'Needs setup';
-  const overviewItems = [
-    {
-      label: 'Media',
-      value: [formData.avatarUrl, formData.backgroundUrl, formData.musicUrl, formData.cursorUrl].filter((item) => item.trim().length > 0).length,
-      hint: 'avatar, background, music, cursor',
-    },
-    {
-      label: 'Profile',
-      value: [formData.displayName, formData.status, formData.location, formData.bio].filter((item) => item.trim().length > 0).length,
-      hint: 'name, status, location, bio',
-    },
-    {
-      label: 'Appearance',
-      value: [formData.accentColor, formData.enterText, formData.fontFamily].filter((item) => item.trim().length > 0).length,
-      hint: 'accent, enter text, font',
-    },
-    {
-      label: 'Links',
-      value: publishedLinksCount,
-      hint: 'published social links',
-    },
-  ];
-  const sectionItems = [
-    { id: 'overview' as Section, label: 'Overview', mobileLabel: 'Overview', icon: BarChart3 },
-    { id: 'media' as Section, label: 'Media', mobileLabel: 'Media', icon: ImageIcon },
-    { id: 'profile' as Section, label: 'Profile', mobileLabel: 'Profile', icon: User },
-    { id: 'appearance' as Section, label: 'Appearance', mobileLabel: 'Style', icon: Sparkles },
-    { id: 'links' as Section, label: 'Links', mobileLabel: 'Links', icon: LinkIcon },
-  ];
-  const activeSection = sectionItems.find((item) => item.id === section) || sectionItems[0];
-  const saveStateLabel =
-    saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Error' : 'Draft';
-  const saveStateBadgeClass =
-    saveState === 'saving'
-      ? 'border-sky-400/35 bg-sky-500/10 text-sky-100'
-      : saveState === 'saved'
-         ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-100'
-         : saveState === 'error'
-           ? 'border-red-400/35 bg-red-500/10 text-red-100'
-           : 'border-white/10 bg-white/[0.04] text-neutral-300';
 
   useEffect(() => {
     if (!didMountSectionRef.current) {
@@ -875,627 +854,428 @@ export default function DashboardClient({
       return;
     }
 
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+    if (typeof window !== 'undefined' && window.innerWidth < 1280) {
       sectionTopRef.current?.scrollIntoView({ behavior: liteMode ? 'auto' : 'smooth', block: 'start' });
     }
   }, [liteMode, section]);
 
+  const accentColor = formData.accentColor || '#7dc0ff';
+  const dashboardTheme = {
+    '--accent': accentColor,
+    '--accent-soft': withAlpha(accentColor, 0.14),
+    '--accent-border': withAlpha(accentColor, 0.52),
+    '--accent-glow': withAlpha(accentColor, 0.28),
+    '--accent-shadow': withAlpha(accentColor, 0.38),
+  } as React.CSSProperties;
+
+  const hasBio = formData.bio.trim().length > 0;
+  const hasLinks = socialItems.some((item) => item.url.trim().length > 0);
+  const hasSong = formData.musicUrl.trim().length > 0;
+  const hasBackground = formData.backgroundUrl.trim().length > 0;
+  const hasAvatar = formData.avatarUrl.trim().length > 0;
+  const publishedLinksCount = socialItems.filter((item) => item.url.trim().length > 0).length;
+  const checklistItems = [
+    { label: 'Avatar added', done: hasAvatar },
+    { label: 'Background set', done: hasBackground },
+    { label: 'Short bio written', done: hasBio },
+    { label: 'At least one link ready', done: hasLinks },
+    { label: 'Theme chosen', done: formData.accentColor.trim().length > 0 },
+  ];
+  const completedChecklistCount = checklistItems.filter((item) => item.done).length;
+  const completionPercent = Math.round((completedChecklistCount / checklistItems.length) * 100);
+  const completionLabel =
+    completionPercent >= 80 ? 'Ready to share' : completionPercent >= 50 ? 'Needs a few final passes' : 'Needs setup';
+  const saveStateLabel =
+    saveState === 'saving'
+      ? 'Saving...'
+      : saveState === 'saved'
+        ? 'Saved'
+        : saveState === 'error'
+          ? 'Needs attention'
+          : 'Draft';
+  const saveStateBadgeClass =
+    saveState === 'saving'
+      ? 'border-sky-400/35 bg-sky-500/10 text-sky-100'
+      : saveState === 'saved'
+        ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-100'
+        : saveState === 'error'
+          ? 'border-red-400/35 bg-red-500/10 text-red-100'
+          : 'border-white/10 bg-white/[0.04] text-[color:var(--text-secondary)]';
+
   return (
     <div
       style={dashboardTheme}
-      className="min-h-screen bg-[radial-gradient(circle_at_8%_-12%,rgba(112,130,255,0.2),transparent_36%),radial-gradient(circle_at_92%_5%,rgba(87,173,255,0.16),transparent_35%),linear-gradient(180deg,#0a111d_0%,#090f19_100%)] text-white lg:h-screen lg:overflow-hidden"
+      className="min-h-screen bg-[radial-gradient(circle_at_10%_-6%,rgba(241,147,113,0.12),transparent_28%),radial-gradient(circle_at_92%_0,rgba(125,192,255,0.18),transparent_30%),linear-gradient(180deg,#090d12_0%,#0c1016_100%)] text-white"
     >
-      <div className="flex min-h-screen flex-col lg:h-screen lg:flex-row">
-        <aside className="hidden w-full flex-col border-b border-white/5 bg-[#0f1625]/92 p-4 shadow-[0_16px_34px_rgba(0,0,0,0.22)] backdrop-blur-2xl lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.05),0_30px_55px_rgba(0,0,0,0.42)]">
-          <Link href="/" className="mb-4 flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.04] p-3 transition-all duration-200 hover:bg-white/[0.07] hover:-translate-y-0.5">
-            <div className="relative h-12 w-12 overflow-hidden rounded-2xl shadow-[0_10px_24px_rgba(95,168,255,0.22)]">
-              <NextImage
-                src="/icon.svg"
-                alt="LinkSky"
-                fill
-                sizes="48px"
-                className="object-cover"
-              />
-            </div>
-            <div>
-              <p className="text-[14px] uppercase tracking-[0.22em] text-neutral-200">LinkSky editor</p>
-            </div>
-          </Link>
-
-          <div className="mb-4 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,22,36,0.88),rgba(12,17,29,0.88))] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Profile completion</p>
-                <p className="mt-2 text-3xl font-black tracking-tight text-white">{completionPercent}%</p>
-              </div>
-              <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-neutral-300">
-                {completionLabel}
-              </div>
-            </div>
-            <p className="mt-3 text-xs leading-5 text-neutral-500">Fill the basics first: avatar, background, bio and at least one link.</p>
-          </div>
-
-          <div className="space-y-2">
-            {sectionItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <TabButton
-                  key={item.id}
-                  label={item.label}
-                  icon={<Icon size={16} />}
-                  active={section === item.id}
-                  onClick={() => setSection(item.id)}
-                />
-              );
-            })}
-          </div>
-
-          <div className="mt-auto space-y-4 pt-5">
-            <div className="flex items-center gap-3 rounded-[24px] bg-white/[0.045] p-3.5 shadow-[0_14px_32px_rgba(0,0,0,0.3)] transition-all duration-200 hover:bg-white/[0.065] hover:-translate-y-0.5">
-              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-neutral-700 ring-1 ring-[#334155]">
-                {formData.avatarUrl ? (
-                  <NextImage
-                    src={formData.avatarUrl}
-                    alt="avatar"
-                    fill
-                    sizes="48px"
-                    className="object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white/75">
-                    {(formData.displayName || user.username).charAt(0).toUpperCase()}
+      <div className="mx-auto max-w-[1580px] px-4 py-4 sm:px-6 lg:px-8">
+        <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="hidden xl:block xl:self-start">
+            <div className="linksky-panel sticky top-4 rounded-[32px] p-5">
+              <div className="flex flex-col gap-4">
+                <Link href="/" className="flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.04] p-3 transition-colors hover:bg-white/[0.06]">
+                  <div className="relative h-12 w-12 overflow-hidden rounded-[18px] border border-white/10 bg-white/10">
+                    <NextImage src="/icon.svg" alt="LinkSky" fill sizes="48px" className="object-cover" />
                   </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{formData.displayName || user.username}</p>
-                <p className="truncate text-xs text-neutral-400">{profileUrl}</p>
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Checklist</p>
-              <div className="mt-3 space-y-2">
-                {checklistItems.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-3 py-2 text-sm">
-                    <span className="text-neutral-200">{item.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${item.done ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/[0.05] text-neutral-400'}`}>
-                      {item.done ? 'Done' : 'Pending'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <main className="relative min-w-0 flex-1 bg-[#0b111c] pb-24 lg:h-screen lg:overflow-y-auto lg:pb-0">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_-10%,rgba(134,153,255,0.08),transparent_35%)]" />
-          <div className="sticky top-0 z-30 border-b border-white/8 bg-[#0b111c]/92 backdrop-blur-2xl lg:hidden">
-            <div className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <Link href="/" className="flex min-w-0 items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-2xl shadow-[0_10px_24px_rgba(95,168,255,0.22)]">
-                    <NextImage
-                      src="/icon.svg"
-                      alt="LinkSky"
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] uppercase tracking-[0.22em] text-neutral-400">LinkSky editor</p>
-                    <p className="truncate text-sm font-semibold text-white">{user.username}</p>
+                  <div>
+                    <p className="font-display text-sm font-semibold tracking-[0.18em] text-white">LINKSKY</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">Dashboard studio</p>
                   </div>
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-neutral-200 transition-all duration-200 hover:bg-white/[0.08]"
-                  aria-label="Logout"
-                >
-                  <LogOut size={16} />
-                </button>
-              </div>
 
-              <div className="mt-3 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,22,36,0.92),rgba(12,17,29,0.92))] p-3 shadow-[0_16px_32px_rgba(0,0,0,0.24)]">
-                <div className="flex items-center gap-3">
-                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-neutral-700 ring-1 ring-[#334155]">
-                    {formData.avatarUrl ? (
-                      <NextImage
-                        src={formData.avatarUrl}
-                        alt="avatar"
-                        fill
-                        sizes="44px"
-                        className="object-cover"
-                        unoptimized
+                <div className="space-y-2">
+                  {SECTION_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <TabButton
+                        key={item.id}
+                        label={item.label}
+                        icon={<Icon size={16} />}
+                        active={section === item.id}
+                        onClick={() => setSection(item.id)}
                       />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white/75">
-                        {(formData.displayName || user.username).charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-white">{formData.displayName || user.username}</p>
-                    <p className="truncate text-xs text-neutral-400">@{user.username} · {activeSection.label}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] text-neutral-200">
-                      {completionPercent}%
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-[28px] border border-white/10 bg-[rgba(255,255,255,0.04)] p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-12 w-12 overflow-hidden rounded-full border border-white/10 bg-white/10">
+                      {formData.avatarUrl ? (
+                        <NextImage src={formData.avatarUrl} alt="avatar" fill sizes="48px" className="object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white">
+                          {(formData.displayName || initialUsername).charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                    <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${saveStateBadgeClass}`}>
-                      {saveState === 'saving' ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-lg font-semibold text-white">
+                        {formData.displayName || initialUsername}
+                      </p>
+                    <p className="truncate text-xs text-[color:var(--text-muted)]">@{initialUsername}</p>
+                  </div>
+                </div>
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">Profile health</p>
+                      <p className="mt-1 font-display text-2xl font-semibold text-white">{completionPercent}%</p>
+                    </div>
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${saveStateBadgeClass}`}>
+                      {saveState === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                       {saveStateLabel}
                     </div>
                   </div>
+                  <p className="mt-3 break-all text-xs leading-6 text-[color:var(--text-muted)]">{profileUrl}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <ActionButton label={copied ? 'Copied' : 'Copy URL'} icon={<Copy size={14} />} onClick={handleCopy} variant="ghost" compact />
+                    <ActionButton label="Open page" icon={<ExternalLink size={14} />} href={profileUrl} variant="ghost" compact />
+                  </div>
                 </div>
 
-                <div className="mt-3 flex items-center gap-2 text-xs text-neutral-400">
-                  <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">
-                    {completionLabel}
-                  </span>
+                <ActionButton label="Log out" icon={<LogOut size={15} />} onClick={handleLogout} variant="ghost" fullWidth />
+              </div>
+            </div>
+          </aside>
+
+          <main className="min-w-0 space-y-4">
+            <header ref={sectionTopRef} className="linksky-panel rounded-[30px] p-4 sm:p-5">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-[760px]">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
+                      {SECTION_META[section].eyebrow}
+                    </p>
+                    <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+                      {SECTION_META[section].title}
+                    </h1>
+                    <p className="mt-3 text-sm leading-7 text-[color:var(--text-secondary)] sm:text-base">
+                      {SECTION_META[section].description}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <ActionButton label="Open" icon={<ExternalLink size={15} />} href={profileUrl} variant="ghost" />
+                    <ActionButton label={copied ? 'Copied' : 'Copy'} icon={<Copy size={15} />} onClick={handleCopy} variant="ghost" />
+                    <ActionButton label="Save" icon={saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} onClick={handleSave} disabled={saveState === 'saving'} variant="primary" />
+                    <ActionButton label="Reset" icon={<RotateCcw size={15} />} onClick={() => setResetConfirmOpen(true)} variant="danger" />
+                  </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-4 gap-2">
-                  <a
-                    href={profileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open profile"
-                    title="Open profile"
-                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#334155] bg-[#111827]/80 text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
-                  >
-                    <ExternalLink size={15} />
-                  </a>
-                  <button
-                    onClick={handleCopy}
-                    aria-label={copied ? 'Copied profile URL' : 'Copy profile URL'}
-                    title={copied ? 'Copied profile URL' : 'Copy profile URL'}
-                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#334155] bg-[#111827]/80 text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
-                  >
-                    <Copy size={15} />
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saveState === 'saving'}
-                    aria-label="Save changes"
-                    title="Save changes"
-                    className="inline-flex h-11 items-center justify-center rounded-2xl text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  </button>
-                  <button
-                    onClick={resetLook}
-                    aria-label="Reset profile"
-                    title="Reset profile"
-                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-red-500/40 bg-red-500/10 text-red-200 transition-all duration-200 hover:bg-red-500/16"
-                  >
-                    <RotateCcw size={15} />
-                  </button>
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 xl:hidden">
+                  {SECTION_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    const active = section === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSection(item.id)}
+                        className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm transition-colors ${
+                          active
+                            ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-white'
+                            : 'border-white/10 bg-white/[0.03] text-[color:var(--text-secondary)] hover:bg-white/[0.06] hover:text-white'
+                        }`}
+                      >
+                        <Icon size={15} />
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-          </div>
 
-          <header className="relative hidden overflow-hidden border-b border-white/5 p-4 md:p-5 lg:sticky lg:top-0 lg:z-30 lg:block">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0,rgba(142,167,255,0.2),transparent_42%),linear-gradient(120deg,rgba(17,24,39,0.92),rgba(11,15,23,0.9))]" />
-            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-xs uppercase tracking-[0.25em] text-neutral-500">Studio</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight md:text-3xl">{user.username}</h1>
-                <p className="mt-2 text-sm leading-6 text-neutral-400 md:text-base">
-                  Update the essentials, keep the public page readable, and publish faster.
-                </p>
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-neutral-300">
-                  <BarChart3 size={13} className="text-[var(--accent)]" />
-                  {analytics.totalViews} views
-                  <span className="text-white/20">/</span>
-                  {analytics.totalClicks} clicks
-                  <span className="text-white/20">/</span>
-                  {analytics.ctr}% CTR
+                {section === 'studio' && (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    <QuickStatCard label="Views" value={analytics.totalViews.toString()} hint="All time" icon={<BarChart3 size={15} />} />
+                    <QuickStatCard label="Clicks" value={analytics.totalClicks.toString()} hint={`${analytics.ctr}% CTR`} icon={<Activity size={15} />} />
+                    <QuickStatCard label="Links live" value={publishedLinksCount.toString()} hint={publishedLinksCount ? 'Ready to share' : 'Add your first link'} icon={<LinkIcon size={15} />} />
+                    <QuickStatCard label="Atmosphere" value={hasSong ? 'On' : 'Off'} hint={hasSong ? formData.songTitle || 'Track added' : 'No music yet'} icon={<Music size={15} />} />
+                  </div>
+                )}
+
+              </div>
+            </header>
+
+            {section === 'studio' && (
+              <Panel title="Studio overview" description="This is the current state of the public page. Keep the basics strong, then open the live page when you want to judge the final feel.">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+                  <div className="rounded-[24px] border border-white/10 bg-[rgba(8,11,16,0.56)] p-5">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">Public URL</p>
+                    <p className="mt-2 break-all font-display text-2xl font-semibold text-white">{profileUrl}</p>
+                    <p className="mt-4 text-sm leading-7 text-[color:var(--text-secondary)]">
+                      {completionPercent >= 80
+                        ? 'The page is ready to share. Open the live version when you want to check the overall mood.'
+                        : 'Finish the core pieces first: avatar, background, bio, and one clear place to click.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-5">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">Essentials</p>
+                    <div className="mt-4 space-y-2">
+                      {checklistItems.map((item) => (
+                        <ChecklistRow key={item.label} label={item.label} done={item.done} />
+                      ))}
+                    </div>
+                  </div>
                 </div>
+              </Panel>
+            )}
+
+            {section === 'content' && (
+              <div className="space-y-4">
+                <Panel title="Identity and copy" description="Keep the top of the page recognizable. Short, specific copy usually works better than trying to say everything at once.">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Input label="Display name" value={formData.displayName} onChange={(value) => setFormData((prev) => ({ ...prev, displayName: value }))} placeholder="mak" />
+                    <Input label="Location" value={formData.location} onChange={(value) => setFormData((prev) => ({ ...prev, location: value }))} placeholder="Kyiv" />
+                    <Input label="Status" value={formData.status} onChange={(value) => setFormData((prev) => ({ ...prev, status: value }))} placeholder="building weird nice things" icon={<BadgeCheck size={14} />} />
+                    <Input label="Enter text" value={formData.enterText} onChange={(value) => setFormData((prev) => ({ ...prev, enterText: value }))} placeholder="[ click to enter ]" />
+                  </div>
+
+                  <div className="mt-4 rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-4">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <Input label="Song title" value={formData.songTitle} onChange={(value) => setFormData((prev) => ({ ...prev, songTitle: value }))} placeholder="Artist - Track" icon={<Music size={14} />} />
+                      <div>
+                        <label htmlFor={bioFieldId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                          Bio
+                        </label>
+                        <textarea
+                          id={bioFieldId}
+                          value={formData.bio}
+                          onChange={(event) => setFormData((prev) => ({ ...prev, bio: event.target.value }))}
+                          rows={5}
+                          className="linksky-textarea text-sm"
+                          placeholder="Tell people what you make, stream, build, or care about."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Panel>
+
+                <Panel title="Media" description="Upload the pieces people notice first. Media saves immediately after upload so the preview stays close to what the public page will show.">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                    <MediaCard label="Background" kind="background" value={formData.backgroundUrl} accept="image/*" onChange={(value) => updateMediaField({ backgroundUrl: value })} transformFile={requestBackgroundCrop} hint="16:9 crop for images" icon={<ImageIcon size={15} />} />
+                    <MediaCard label="Audio" kind="audio" value={formData.musicUrl} accept="audio/*" onChange={(value) => updateMediaField({ musicUrl: value })} onUploaded={({ fileName }) => {
+                      const autoTitle = fileNameToTrackTitle(fileName);
+                      if (!autoTitle) return;
+                      updateMediaField({ songTitle: autoTitle });
+                    }} hint="Optional background track" icon={<Music size={15} />} />
+                    <MediaCard label="Avatar" kind="avatar" value={formData.avatarUrl} accept="image/*" onChange={(value) => updateMediaField({ avatarUrl: value })} transformFile={requestAvatarCrop} hint="Square crop" icon={<User size={15} />} />
+                    <MediaCard label="Cursor" kind="cursor" value={formData.cursorUrl} accept="image/*,.cur" onChange={(value) => updateMediaField({ cursorUrl: value })} transformFile={transformCursorFile} hint="Auto-optimized to 64x64" icon={<MousePointer2 size={15} />} />
+                  </div>
+                </Panel>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                <a
-                  href={profileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2.5 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
-                >
-                  <ExternalLink size={15} />
-                  Open profile
-                </a>
-                <button
-                  onClick={handleCopy}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2.5 text-sm text-neutral-100 transition-all duration-200 hover:border-[#46556d] hover:bg-[#1a2436]"
-                >
-                  <Copy size={15} />
-                  {copied ? 'Copied' : 'Copy URL'}
-                </button>
-                <button
-                  onClick={resetLook}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/45 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-200 transition-all duration-200 hover:bg-red-500/16"
-                >
-                  <RotateCcw size={15} />
-                  Reset profile
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saveState === 'saving'}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 [background:var(--accent)] [box-shadow:0_10px_28px_var(--accent-shadow)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  Save now
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#334155] bg-transparent px-3.5 py-2.5 text-sm text-neutral-200 transition-all duration-200 hover:bg-[#141c2b] sm:col-span-1"
-                >
-                  <LogOut size={15} />
-                  Logout
-                </button>
-              </div>
-            </div>
-          </header>
-          <section ref={sectionTopRef} className="scroll-mt-52 space-y-4 p-4 pb-6 md:p-5 lg:scroll-mt-24 lg:pb-5">
-            <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-4 ${section === 'overview' ? '' : 'hidden lg:grid'}`}>
-              <QuickStatCard label="Completion" value={`${completionPercent}%`} hint={completionLabel} icon={<Sparkles size={15} />} />
-              <QuickStatCard label="Views" value={analytics.totalViews.toString()} hint="All time" icon={<BarChart3 size={15} />} />
-              <QuickStatCard label="Clicks" value={analytics.totalClicks.toString()} hint={`${analytics.ctr}% CTR`} icon={<Activity size={15} />} />
-              <QuickStatCard label="Links ready" value={publishedLinksCount.toString()} hint={publishedLinksCount ? 'Ready to share' : 'Add your first link'} icon={<LinkIcon size={15} />} />
-            </div>
-            <AnimatePresence mode="wait" initial={false}>
-              {section !== 'links' ? (
-                <motion.div
-                  key={section}
-                  initial={{ opacity: 0, y: sectionOffset }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -sectionOffset }}
-                  transition={sectionTransition}
-                  className="space-y-4"
-                >
-                  {section === 'overview' && (
-                    <Panel title="Overview" description="A simple summary of what is ready and what still needs attention.">
-                      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                        {overviewItems.map((item) => (
-                          <div key={item.label} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
-                            <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">{item.label}</p>
-                            <p className="mt-2 text-2xl font-black tracking-tight text-white md:text-3xl">{item.value}</p>
-                            <p className="mt-1 text-xs leading-5 text-neutral-400">{item.hint}</p>
-                          </div>
+            )}
+
+            {section === 'theme' && (
+              <div className="space-y-4">
+                <Panel title="Visual tone" description="Choose the accent and font first, then fine-tune the panel treatment. Small decisions here do more than piling on extra effects.">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <label id={accentColorLabelId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                        Accent color
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input type="color" value={formData.accentColor} onChange={(event) => setFormData((prev) => ({ ...prev, accentColor: event.target.value }))} aria-labelledby={accentColorLabelId} className="h-12 w-14 rounded-2xl border border-white/10 bg-transparent" />
+                        <input value={formData.accentColor} onChange={(event) => setFormData((prev) => ({ ...prev, accentColor: event.target.value }))} aria-labelledby={accentColorLabelId} placeholder="#7dc0ff" className="linksky-input text-sm" />
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {QUICK_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, accentColor: color }))}
+                            aria-label={`Set accent color ${color}`}
+                            className={`h-9 w-9 rounded-full border transition-transform hover:scale-105 ${formData.accentColor.toLowerCase() === color.toLowerCase() ? 'border-white shadow-[0_0_0_2px_rgba(255,255,255,0.12)]' : 'border-white/10'}`}
+                            style={{ backgroundColor: color }}
+                          />
                         ))}
                       </div>
-                      <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-3">
-                        <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">Profile status</p>
-                          <p className="mt-2 text-base font-semibold text-white md:text-lg">{completionLabel}</p>
-                          <p className="mt-1 text-xs leading-5 text-neutral-400">Minimal, shareable profile setup.</p>
-                        </div>
-                        <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">Audio</p>
-                          <p className="mt-2 text-base font-semibold text-white md:text-lg">{hasSong ? (formData.songTitle || 'Track uploaded') : 'No audio yet'}</p>
-                          <p className="mt-1 text-xs leading-5 text-neutral-400">Optional background music for the public page.</p>
-                        </div>
-                        <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3.5">
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">Links</p>
-                          <p className="mt-2 text-base font-semibold text-white md:text-lg">{publishedLinksCount ? `${publishedLinksCount} ready` : 'No links yet'}</p>
-                          <p className="mt-1 text-xs leading-5 text-neutral-400">People need at least one clear place to click.</p>
-                        </div>
-                      </div>
-                    </Panel>
-                  )}
-
-                  {section === 'media' && (
-                    <Panel title="Media" description="Upload the pieces users notice first. Media saves immediately after upload.">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-                      <MediaCard
-                        label="Background"
-                        kind="background"
-                        value={formData.backgroundUrl}
-                        accept="image/*"
-                        onChange={(v) => updateMediaField({ backgroundUrl: v })}
-                        transformFile={requestBackgroundCrop}
-                        hint='16:9 crop for images'
-                        icon={<ImageIcon size={15} />}
-                      />
-                      <MediaCard
-                        label="Audio"
-                        kind="audio"
-                        value={formData.musicUrl}
-                        accept="audio/*"
-                        onChange={(v) => updateMediaField({ musicUrl: v })}
-                        onUploaded={({ fileName }) => {
-                          const autoTitle = fileNameToTrackTitle(fileName);
-                          if (!autoTitle) return;
-                          updateMediaField({ songTitle: autoTitle });
-                        }}
-                        hint='Your favorite song'
-                        icon={<Music size={15} />}
-                      />
-                      <MediaCard
-                        label="Avatar"
-                        kind="avatar"
-                        value={formData.avatarUrl}
-                        accept="image/*"
-                        onChange={(v) => updateMediaField({ avatarUrl: v })}
-                        transformFile={requestAvatarCrop}
-                        hint="Square avatar"
-                        icon={<User size={15} />}
-                      />
-                      <MediaCard
-                        label="Cursor"
-                        kind="cursor"
-                        value={formData.cursorUrl}
-                        accept="image/*,.cur"
-                        onChange={(v) => updateMediaField({ cursorUrl: v })}
-                        transformFile={transformCursorFile}
-                        hint="Auto-optimized to 64x64"
-                        icon={<MousePointer2 size={15} />}
-                      />
-                    </div>
-                    </Panel>
-                  )}
-
-                  {section === 'overview' && (
-                    <Panel title="Analytics snapshot" description="Recent performance for the current public profile.">
-                      <AnalyticsOverview analytics={analytics} />
-                    </Panel>
-                  )}
-
-                  {section === 'profile' && (
-                    <Panel title="Profile details" description="Keep the first screen short, recognizable and readable.">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      <Input label="Display name" value={formData.displayName} onChange={(v) => setFormData((p) => ({ ...p, displayName: v }))} placeholder="username" />
-                      <Input label="Location" value={formData.location} onChange={(v) => setFormData((p) => ({ ...p, location: v }))} placeholder="Kyiv" />
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-[#2a3447] bg-[#0b1220]/75 p-4 md:p-5 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-neutral-500 mb-3">Now playing</p>
-                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <Input label="Status" value={formData.status} onChange={(v) => setFormData((p) => ({ ...p, status: v }))} placeholder="Online" icon={<BadgeCheck size={14} />} />
-                        <Input label="Song title" value={formData.songTitle} onChange={(v) => setFormData((p) => ({ ...p, songTitle: v }))} placeholder="Artist - Track" />
-                      </div>
+                    <div>
+                      <label htmlFor={fontFamilyId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                        Font family
+                      </label>
+                      <select id={fontFamilyId} value={formData.fontFamily} onChange={(event) => setFormData((prev) => ({ ...prev, fontFamily: event.target.value as ProfileForm['fontFamily'] }))} className="linksky-select text-sm">
+                        <option value="sans">Sans</option>
+                        <option value="serif">Serif</option>
+                        <option value="mono">Mono</option>
+                      </select>
+                      <p className="mt-2 text-sm leading-7 text-[color:var(--text-secondary)]">
+                        Pick the family that matches the voice of the page. Sans stays clean, serif feels editorial, mono feels more terminal-like.
+                      </p>
                     </div>
+                  </div>
+                </Panel>
 
-                    <div className="mt-4">
-                      <label htmlFor={bioFieldId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-neutral-400">Bio</label>
-                      <textarea
-                        id={bioFieldId}
-                        value={formData.bio}
-                        onChange={(e) => setFormData((p) => ({ ...p, bio: e.target.value }))}
-                        rows={4}
-                        className="w-full rounded-2xl bg-[#0b1220] border border-[#273247] px-3.5 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
-                        placeholder="Tell people who you are"
-                      />
-                    </div>
-                    </Panel>
-                  )}
+                <Panel title="Surface and behavior" description="These settings control how soft, sharp, or dramatic the page card feels once someone enters.">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <RangeRow label="Card opacity" value={formData.cardOpacity} min={0.2} max={0.9} step={0.05} onChange={(value) => setFormData((prev) => ({ ...prev, cardOpacity: value }))} />
+                    <RangeRow label="Blur strength" value={formData.blurStrength} min={0} max={32} step={1} onChange={(value) => setFormData((prev) => ({ ...prev, blurStrength: value }))} />
+                  </div>
 
-                  {section === 'appearance' && (
-                    <Panel title="Look & behavior" description="Tune the accent, entry copy and visibility without overcomplicating the page.">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label id={accentColorLabelId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-neutral-400">Accent color</label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="color"
-                            value={formData.accentColor}
-                            onChange={(e) => setFormData((p) => ({ ...p, accentColor: e.target.value }))}
-                            aria-labelledby={accentColorLabelId}
-                            aria-label="Accent color picker"
-                            className="h-11 w-12 rounded-xl bg-transparent border border-[#2e3a50]"
-                          />
-                          <input
-                            value={formData.accentColor}
-                            onChange={(e) => setFormData((p) => ({ ...p, accentColor: e.target.value }))}
-                            aria-labelledby={accentColorLabelId}
-                            aria-label="Accent color hex value"
-                            placeholder="#8ea7ff"
-                            className="flex-1 rounded-2xl bg-[#0b1220] border border-[#273247] px-3.5 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
-                          />
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {quickColors.map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() => setFormData((p) => ({ ...p, accentColor: color }))}
-                              aria-label={`Set accent color ${color}`}
-                              className={`h-8 w-8 rounded-full border transition-transform hover:scale-105 ${
-                                formData.accentColor.toLowerCase() === color.toLowerCase()
-                                  ? 'border-white shadow-[0_0_0_2px_rgba(255,255,255,0.12)]'
-                                  : 'border-white/10'
-                              }`}
-                              style={{ backgroundColor: color }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <Input label="Enter text" value={formData.enterText} onChange={(v) => setFormData((p) => ({ ...p, enterText: v }))} placeholder="[ click to enter ]" />
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <Toggle label="Show views" value={formData.showViews} onToggle={(value) => setFormData((prev) => ({ ...prev, showViews: value }))} icon={formData.showViews ? <Eye size={14} /> : <EyeOff size={14} />} />
+                    <Toggle label="Glow" value={formData.enableGlow} onToggle={(value) => setFormData((prev) => ({ ...prev, enableGlow: value }))} icon={<Sparkles size={14} />} />
+                    <div className="rounded-2xl border border-white/10 bg-[rgba(8,11,16,0.56)] px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Current feel</p>
+                      <p className="mt-2 font-display text-lg font-semibold text-white">
+                        {formData.enableGlow ? 'Soft highlight' : 'Clean panel'}
+                      </p>
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                        {formData.blurStrength > 18 ? 'More haze behind the card.' : 'Sharper edges and less blur.'}
+                      </p>
                     </div>
+                  </div>
+                </Panel>
+              </div>
+            )}
 
-                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <RangeRow label="Card opacity" value={formData.cardOpacity} min={0.2} max={0.9} step={0.05} onChange={(v) => setFormData((p) => ({ ...p, cardOpacity: v }))} />
-                      <RangeRow label="Blur strength" value={formData.blurStrength} min={0} max={32} step={1} onChange={(v) => setFormData((p) => ({ ...p, blurStrength: v }))} />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <Toggle label="Show views" value={formData.showViews} onToggle={(v) => setFormData((p) => ({ ...p, showViews: v }))} icon={formData.showViews ? <Eye size={14} /> : <EyeOff size={14} />} />
-                      <Toggle label="Glow" value={formData.enableGlow} onToggle={(v) => setFormData((p) => ({ ...p, enableGlow: v }))} icon={<Sparkles size={14} />} />
-                      <div>
-                        <label htmlFor={fontFamilyId} className="mb-2 block text-xs uppercase tracking-[0.18em] text-neutral-400">Font</label>
-                        <select
-                          id={fontFamilyId}
-                          value={formData.fontFamily}
-                          onChange={(e) => setFormData((p) => ({ ...p, fontFamily: e.target.value as ProfileForm['fontFamily'] }))}
-                          className="w-full rounded-2xl bg-[#0b1220] border border-[#273247] px-3.5 py-2.5 text-sm text-neutral-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
-                        >
-                          <option value="sans">Sans</option>
-                          <option value="serif">Serif</option>
-                          <option value="mono">Mono</option>
-                        </select>
-                      </div>
-                    </div>
-                    </Panel>
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="links"
-                  initial={{ opacity: 0, y: sectionOffset }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -sectionOffset }}
-                  transition={sectionTransition}
-                  className="space-y-4"
-                >
-                  <Panel title="Add social links" description="Start with the platforms people already expect to find.">
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 lg:grid-cols-10">
-                      {SOCIAL_PRESETS.map((platform) => (
-                        <button
-                          key={platform}
-                          type="button"
-                          onClick={() => addSocial(platform)}
-                          aria-label={`Add ${platform} link`}
-                          className="flex h-14 items-center justify-center rounded-xl border border-[#2b3548] bg-[#0f1728]/70 transition-all duration-200 hover:border-[#3b4a62] hover:bg-[#1c263a]"
-                          title={platform}
-                        >
-                          {SOCIAL_ICON_MAP[platform] || <span className="text-xs uppercase text-neutral-300">{platform.slice(0, 2)}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </Panel>
-
-                  <Panel
-                    title="Your links"
-                    description="Use arrows on mobile or drag on desktop. Links without a URL will not be shown publicly."
-                    actions={
-                      <button type="button" onClick={() => addSocial('custom')} className="inline-flex items-center gap-2 rounded-xl border border-[#334155] bg-[#111827]/80 px-3.5 py-2 text-sm hover:bg-[#1a2436] transition-all duration-200">
-                        <Plus size={15} />
-                        Add custom
+            {section === 'links' && (
+              <div className="space-y-4">
+                <Panel title="Quick add" description="Start with the platforms people already expect to find. Add custom links only when the usual presets are not enough.">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 lg:grid-cols-10">
+                    {SOCIAL_PRESETS.map((platform) => (
+                      <button
+                        key={platform}
+                        type="button"
+                        onClick={() => addSocial(platform)}
+                        aria-label={`Add ${platform} link`}
+                        className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(8,11,16,0.56)] text-[color:var(--text-secondary)] transition-colors hover:border-white/16 hover:bg-white/[0.06] hover:text-white"
+                        title={platform}
+                      >
+                        {SOCIAL_ICON_MAP[platform] || <span className="text-xs uppercase">{platform.slice(0, 2)}</span>}
                       </button>
-                    }
-                  >
+                    ))}
+                  </div>
+                </Panel>
 
-                    {!socialItems.length && <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-neutral-400">No links yet.</p>}
+                <Panel
+                  title="Link stack"
+                  description="Links without a URL stay hidden on the public page. Use arrows on mobile or drag on larger screens to set the order."
+                  actions={
+                    <button type="button" onClick={() => addSocial('custom')} className="linksky-button-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm">
+                      <Plus size={15} />
+                      Add custom link
+                    </button>
+                  }
+                >
+                  {!socialItems.length ? (
+                    <div className="rounded-[24px] border border-dashed border-white/12 bg-white/[0.03] px-4 py-6 text-sm text-[color:var(--text-secondary)]">
+                      No links yet. Add the places people should click first.
+                    </div>
+                  ) : null}
 
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      {socialItems.map((item, index) => (
-                        <div
-                          key={item.id}
-                          draggable
-                          onDragStart={() => setDraggedSocialId(item.id)}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={() => {
-                            if (draggedSocialId && draggedSocialId !== item.id) {
-                              moveSocial(draggedSocialId, item.id);
-                            }
-                            setDraggedSocialId(null);
-                          }}
-                          onDragEnd={() => setDraggedSocialId(null)}
-                          className={`space-y-2 rounded-2xl border p-3 shadow-[0_10px_24px_rgba(0,0,0,0.28)] transition-all duration-200 hover:-translate-y-0.5 ${
-                            draggedSocialId === item.id
-                              ? 'border-[var(--accent-border)] bg-[#152036]'
-                              : 'border-[#2a3548] bg-[#111827]/85'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                title="Drag to reorder"
-                                aria-label="Drag to reorder link"
-                                className="hidden h-9 w-9 rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-400 lg:flex lg:items-center lg:justify-center lg:cursor-grab lg:active:cursor-grabbing"
-                              >
-                                <GripVertical size={15} />
-                              </button>
-                              <div className="flex items-center gap-1 lg:hidden">
-                                <button
-                                  type="button"
-                                  onClick={() => nudgeSocial(item.id, 'up')}
-                                  disabled={index === 0}
-                                  aria-label="Move link up"
-                                  title="Move link up"
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-300 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-35"
-                                >
-                                  <ChevronUp size={15} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => nudgeSocial(item.id, 'down')}
-                                  disabled={index === socialItems.length - 1}
-                                  aria-label="Move link down"
-                                  title="Move link down"
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#334155] bg-[#0b1220] text-neutral-300 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-35"
-                                >
-                                  <ChevronDown size={15} />
-                                </button>
-                              </div>
-                              <select value={item.platform} onChange={(e) => updateSocial(item.id, { platform: e.target.value })} aria-label="Social platform" className="rounded-xl bg-[#0b1220] border border-[#273247] px-3 py-2 text-sm text-neutral-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]">
-                                {SOCIAL_PRESETS.map((platform) => (
-                                  <option key={platform} value={platform}>{platform}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <button type="button" title="Delete link" aria-label="Delete link" onClick={() => removeSocial(item.id)} className="h-9 w-9 rounded-xl border border-red-500/35 bg-red-500/10 text-red-300 flex items-center justify-center transition-all duration-200 hover:bg-red-500/20">
-                              <Trash2 size={15} />
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {socialItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        draggable
+                        onDragStart={() => setDraggedSocialId(item.id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          if (draggedSocialId && draggedSocialId !== item.id) {
+                            moveSocial(draggedSocialId, item.id);
+                          }
+                          setDraggedSocialId(null);
+                        }}
+                        onDragEnd={() => setDraggedSocialId(null)}
+                        className={`rounded-[24px] border p-3 transition-colors ${
+                          draggedSocialId === item.id ? 'border-[var(--accent-border)] bg-[rgba(125,192,255,0.12)]' : 'border-white/10 bg-[rgba(8,11,16,0.56)]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <button type="button" title="Drag to reorder" aria-label="Drag to reorder link" className="hidden h-9 w-9 rounded-xl border border-white/10 bg-white/[0.03] text-[color:var(--text-secondary)] lg:flex lg:items-center lg:justify-center lg:cursor-grab lg:active:cursor-grabbing">
+                              <GripVertical size={15} />
                             </button>
+                            <div className="flex items-center gap-1 lg:hidden">
+                              <button type="button" onClick={() => nudgeSocial(item.id, 'up')} disabled={index === 0} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-[color:var(--text-secondary)] disabled:opacity-35" aria-label="Move link up">
+                                <ChevronUp size={15} />
+                              </button>
+                              <button type="button" onClick={() => nudgeSocial(item.id, 'down')} disabled={index === socialItems.length - 1} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-[color:var(--text-secondary)] disabled:opacity-35" aria-label="Move link down">
+                                <ChevronDown size={15} />
+                              </button>
+                            </div>
+                            <select value={item.platform} onChange={(event) => updateSocial(item.id, { platform: event.target.value })} aria-label="Social platform" className="linksky-select max-w-[170px] text-sm">
+                              {SOCIAL_PRESETS.map((platform) => (
+                                <option key={platform} value={platform}>
+                                  {platform}
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
-                          <input
-                            value={item.url}
-                            onChange={(e) => updateSocial(item.id, { url: e.target.value })}
-                            placeholder="https://..."
-                            aria-label="Social link URL"
-                            className="w-full rounded-xl bg-[#0b1220] border border-[#273247] px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
-                          />
-                          {item.platform === 'custom' && (
-                            <input
-                              value={item.customPlatform}
-                              onChange={(e) => updateSocial(item.id, { customPlatform: e.target.value })}
-                              placeholder="custom platform"
-                              aria-label="Custom platform name"
-                              className="w-full rounded-xl bg-[#0b1220] border border-[#273247] px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent-glow)] focus:border-[color:var(--accent-border)]"
-                            />
-                          )}
+                          <button type="button" onClick={() => removeSocial(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-500/35 bg-red-500/10 text-red-100 transition-colors hover:bg-red-500/18" aria-label="Delete link">
+                            <Trash2 size={15} />
+                          </button>
                         </div>
-                      ))}
-                    </div>
-	                  </Panel>
-	                </motion.div>
-	              )}
-	            </AnimatePresence>
-          </section>
-        </main>
-      </div>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b111c]/95 px-2 py-2 backdrop-blur-2xl lg:hidden">
-        <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
-          {sectionItems.map((item) => {
-            const Icon = item.icon;
-            const active = section === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSection(item.id)}
-                className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[11px] font-medium transition-all duration-200 ${
-                  active
-                    ? 'bg-[var(--accent-soft)] text-white shadow-[0_10px_24px_var(--accent-glow)]'
-                    : 'text-neutral-400 hover:bg-white/[0.05] hover:text-white'
-                }`}
-              >
-                <Icon size={17} />
-                <span className="truncate">{item.mobileLabel}</span>
-              </button>
-            );
-          })}
+
+                        <div className="mt-3 space-y-2">
+                          <input value={item.url} onChange={(event) => updateSocial(item.id, { url: event.target.value })} placeholder="https://..." aria-label="Social link URL" className="linksky-input text-sm" />
+                          {item.platform === 'custom' ? (
+                            <input value={item.customPlatform} onChange={(event) => updateSocial(item.id, { customPlatform: event.target.value })} placeholder="custom platform name" aria-label="Custom platform name" className="linksky-input text-sm" />
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              </div>
+            )}
+
+            {section === 'insights' && (
+              <Panel title="Performance snapshot" description="Use this to see whether the page is being opened and whether people are actually clicking through.">
+                <AnalyticsOverview analytics={analytics} />
+              </Panel>
+            )}
+          </main>
         </div>
-      </nav>
+      </div>
+
       <ConfirmDialog
         open={resetConfirmOpen}
         title="Reset profile?"
-        description="This will clear media, links, bio, status, colors and other custom settings. Your account and username will stay the same."
+        description="This clears media, links, copy, colors, and other custom settings. Your account and username stay the same."
         confirmLabel="Reset everything"
         loading={resettingProfile}
         onCancel={() => {
@@ -1512,9 +1292,7 @@ export default function DashboardClient({
         crop={avatarCrop.crop}
         onCropChange={(crop) => setAvatarCrop((prev) => ({ ...prev, crop }))}
         onZoomChange={(zoom) => setAvatarCrop((prev) => ({ ...prev, zoom }))}
-        onCropComplete={(_, croppedAreaPixels) =>
-          setAvatarCrop((prev) => ({ ...prev, croppedAreaPixels }))
-        }
+        onCropComplete={(_, croppedAreaPixels) => setAvatarCrop((prev) => ({ ...prev, croppedAreaPixels }))}
         onCancel={() => resolveAvatarCrop(null)}
         onConfirm={handleConfirmAvatarCrop}
       />
@@ -1526,9 +1304,7 @@ export default function DashboardClient({
         crop={backgroundCrop.crop}
         onCropChange={(crop) => setBackgroundCrop((prev) => ({ ...prev, crop }))}
         onZoomChange={(zoom) => setBackgroundCrop((prev) => ({ ...prev, zoom }))}
-        onCropComplete={(_, croppedAreaPixels) =>
-          setBackgroundCrop((prev) => ({ ...prev, croppedAreaPixels }))
-        }
+        onCropComplete={(_, croppedAreaPixels) => setBackgroundCrop((prev) => ({ ...prev, croppedAreaPixels }))}
         onCancel={() => resolveBackgroundCrop(null)}
         onConfirm={handleConfirmBackgroundCrop}
       />
@@ -1548,13 +1324,78 @@ function QuickStatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-white/8 bg-[linear-gradient(180deg,rgba(14,20,34,0.88),rgba(11,17,29,0.82))] p-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] sm:p-3.5">
-      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+    <div className="rounded-[22px] border border-white/10 bg-[rgba(8,11,16,0.56)] p-4">
+      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
         {icon}
         {label}
       </div>
-      <p className="mt-2 text-xl font-black tracking-tight text-white sm:text-2xl">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-neutral-400">{hint}</p>
+      <p className="mt-2 font-display text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">{hint}</p>
     </div>
+  );
+}
+
+function ChecklistRow({
+  label,
+  done,
+  large = false,
+}: {
+  label: string;
+  done: boolean;
+  large?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.03] ${large ? 'px-4 py-3.5' : 'px-3 py-2.5'}`}>
+      <span className={`text-sm ${done ? 'text-white' : 'text-[color:var(--text-secondary)]'}`}>{label}</span>
+      <span className={`rounded-full px-2.5 py-1 text-[11px] ${done ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/[0.05] text-[color:var(--text-muted)]'}`}>
+        {done ? 'Done' : 'Pending'}
+      </span>
+    </div>
+  );
+}
+
+function ActionButton({
+  label,
+  icon,
+  onClick,
+  href,
+  disabled = false,
+  variant = 'ghost',
+  compact = false,
+  fullWidth = false,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  variant?: 'ghost' | 'primary' | 'danger';
+  compact?: boolean;
+  fullWidth?: boolean;
+}) {
+  const sharedClassName = `inline-flex items-center justify-center gap-2 rounded-[22px] border text-sm transition-colors ${
+    compact ? 'px-3 py-2.5' : 'min-h-12 px-4 py-3'
+  } ${fullWidth ? 'w-full' : 'w-full'} ${
+    variant === 'primary'
+      ? 'border-transparent bg-[#f5efe6] text-[#11151c] hover:bg-white'
+      : variant === 'danger'
+        ? 'border-red-500/35 bg-red-500/10 text-red-100 hover:bg-red-500/18'
+        : 'border-white/10 bg-white/[0.03] text-[color:var(--text-secondary)] hover:bg-white/[0.08] hover:text-white'
+  } ${disabled ? 'cursor-not-allowed opacity-70' : ''}`;
+
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className={sharedClassName}>
+        {icon}
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={sharedClassName}>
+      {icon}
+      {label}
+    </button>
   );
 }

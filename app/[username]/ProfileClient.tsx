@@ -22,7 +22,6 @@ import {
   MapPin,
   X,
 } from 'lucide-react';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import type { SocialLink, UserProfile } from '@/lib/db';
 import { useLiteMode } from '@/lib/use-lite-mode';
 
@@ -97,8 +96,7 @@ export default function ProfileClient({
   username: string;
   previewMode?: boolean;
 }) {
-  const reduceMotion = useReducedMotion();
-  const liteMode = useLiteMode(!!reduceMotion);
+  const liteMode = useLiteMode();
   const [entered, setEntered] = useState(previewMode);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -106,6 +104,7 @@ export default function ProfileClient({
   const [showPromoBanner, setShowPromoBanner] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const viewTrackedRef = useRef(false);
+  const lastProgressUpdateRef = useRef(0);
 
   const accentColor = profile.accentColor || '#8ea7ff';
   const cardOpacity = clamp(profile.cardOpacity ?? 0.4, 0.2, 0.9);
@@ -116,7 +115,7 @@ export default function ProfileClient({
     if (previewMode) return;
     if (viewTrackedRef.current) return;
     viewTrackedRef.current = true;
-    fetch(`/api/users/${username}/view`, { method: 'POST', keepalive: true }).catch(console.error);
+    fetch(`/api/users/${username}/view`, { method: 'POST', keepalive: true }).catch(() => undefined);
   }, [username, previewMode]);
 
   useEffect(() => {
@@ -124,22 +123,39 @@ export default function ProfileClient({
     if (!audio) return;
 
     const updateProgress = () => {
-      setProgress(audio.currentTime);
-      setDuration(audio.duration || 0);
+      const nextTime = audio.currentTime;
+      const nextDuration = audio.duration || 0;
+
+      if (!Number.isNaN(nextDuration)) {
+        setDuration((current) => (current === nextDuration ? current : nextDuration));
+      }
+
+      if (Math.abs(nextTime - lastProgressUpdateRef.current) >= 0.25) {
+        lastProgressUpdateRef.current = nextTime;
+        setProgress(nextTime);
+      }
     };
     const handleEnded = () => setIsPlaying(false);
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+    const handleLoadedMetadata = () => {
+      const nextDuration = audio.duration || 0;
+      lastProgressUpdateRef.current = audio.currentTime;
+      setProgress(audio.currentTime);
+      setDuration(nextDuration);
+    };
 
     audio.addEventListener('timeupdate', updateProgress);
-    audio.addEventListener('loadedmetadata', updateProgress);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleLoadedMetadata);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
 
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
-      audio.removeEventListener('loadedmetadata', updateProgress);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
@@ -161,7 +177,7 @@ export default function ProfileClient({
 
     if (!liteMode && audioRef.current && profile.musicUrl) {
       audioRef.current.volume = 0.5;
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => undefined);
     }
   };
 
@@ -170,7 +186,7 @@ export default function ProfileClient({
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        audioRef.current.play().catch(console.error);
+        audioRef.current.play().catch(() => undefined);
       }
     }
   };
@@ -207,10 +223,6 @@ export default function ProfileClient({
 
   const socials = useMemo(() => normalizeSocials(profile.socials), [profile.socials]);
 
-  const revealDistance = liteMode ? 0 : 10;
-  const contentTransition = liteMode
-    ? { duration: 0.01 }
-    : { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
   const isEntered = previewMode || entered;
   const shouldRenderVideoBackground = Boolean(isVideoBg && isEntered && !liteMode);
 
@@ -230,6 +242,15 @@ export default function ProfileClient({
         <div className="fixed inset-0 z-0">
         {shouldRenderVideoBackground ? (
           <video src={profile.backgroundUrl} autoPlay loop muted playsInline className="w-full h-full object-cover opacity-55" preload="metadata" />
+        ) : profile.backgroundUrl ? (
+          <Image
+            src={profile.backgroundUrl}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover opacity-55"
+          />
         ) : (
           <div
             className="w-full h-full bg-cover bg-center opacity-55"
@@ -238,42 +259,26 @@ export default function ProfileClient({
                   background:
                     `radial-gradient(circle at top, ${accentColor}26, transparent 38%), linear-gradient(180deg, rgba(7,10,18,0.95), rgba(3,5,10,0.98))`,
                 }
-              : { backgroundImage: `url(${profile.backgroundUrl || '/demo/background.svg'})` }}
+              : { backgroundImage: 'url(/demo/background.svg)' }}
           />
         )}
       </div>
 
       {profile.musicUrl && <audio ref={audioRef} src={profile.musicUrl} loop preload={liteMode ? 'none' : 'metadata'} />}
 
-      <AnimatePresence>
-        {!isEntered && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={contentTransition}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-[2px] cursor-pointer px-4"
-            onClick={handleEnter}
-          >
-            <motion.p
-              initial={{ opacity: 0, y: revealDistance }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={contentTransition}
-              className="text-lg sm:text-2xl font-light tracking-[0.25em] text-center"
-            >
-              {profile.enterText || '[ click to enter ]'}
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {!isEntered && (
+        <div
+          className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/65 px-4 backdrop-blur-[2px]"
+          onClick={handleEnter}
+        >
+          <p className="text-center text-lg font-light tracking-[0.25em] sm:text-2xl">
+            {profile.enterText || '[ click to enter ]'}
+          </p>
+        </div>
+      )}
 
-      <AnimatePresence>
-        {isEntered && (
-          <motion.div
-              initial={{ opacity: 0, y: revealDistance }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={contentTransition}
-            className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:py-10"
-          >
+      {isEntered && (
+        <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:py-10">
             <div
               className="w-full max-w-[92vw] sm:max-w-[520px] border border-white/10 rounded-[1.7rem] sm:rounded-[2rem] p-5 sm:p-8 relative overflow-hidden shadow-xl"
               style={{
@@ -283,11 +288,8 @@ export default function ProfileClient({
               }}
             >
               <div className="flex flex-col items-center">
-                <motion.div
-                  initial={{ opacity: 0, y: revealDistance }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...contentTransition, delay: liteMode ? 0 : 0.04 }}
-                  className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2"
+                <div
+                  className="relative h-24 w-24 overflow-hidden rounded-full border-2 sm:h-32 sm:w-32"
                   style={{ borderColor: `${accentColor}80`, boxShadow: profile.enableGlow ? `0 0 28px ${accentColor}66` : 'none' }}
                 >
                   <Image
@@ -297,18 +299,12 @@ export default function ProfileClient({
                     sizes="(max-width: 640px) 96px, 128px"
                     className="object-cover"
                     priority
-                    unoptimized={!!profile.avatarUrl}
                   />
-                </motion.div>
+                </div>
 
-                <motion.h1
-                  initial={{ y: revealDistance, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ ...contentTransition, delay: liteMode ? 0 : 0.08 }}
-                  className="mt-5 sm:mt-6 text-xl sm:text-2xl font-semibold text-white/95 tracking-wide text-center break-words"
-                >
+                <h1 className="mt-5 text-center text-xl font-semibold tracking-wide text-white/95 break-words sm:mt-6 sm:text-2xl">
                   {profile.displayName || username}
-                </motion.h1>
+                </h1>
 
                 {!!profile.status && <p className="mt-2 text-sm text-white/75 text-center">{profile.status}</p>}
                 {!!profile.bio && <p className="mt-2 max-w-[42ch] text-sm sm:text-base text-white/75 text-center">{profile.bio}</p>}
@@ -320,12 +316,7 @@ export default function ProfileClient({
                 )}
 
                 {!!socials.length && (
-                  <motion.div
-                    initial={{ y: revealDistance, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ ...contentTransition, delay: liteMode ? 0 : 0.12 }}
-                    className="flex items-center justify-center gap-4 sm:gap-6 mt-6 sm:mt-8 flex-wrap"
-                  >
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-4 sm:mt-8 sm:gap-6">
                     {socials.map((social) => {
                       const icon = socialIconMap[social.platform] || <Globe size={24} />;
                       return (
@@ -343,7 +334,7 @@ export default function ProfileClient({
                         </a>
                       );
                     })}
-                  </motion.div>
+                  </div>
                 )}
               </div>
 
@@ -356,11 +347,8 @@ export default function ProfileClient({
             </div>
 
             {profile.musicUrl && (
-              <motion.div
-                initial={{ y: revealDistance, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ ...contentTransition, delay: liteMode ? 0 : 0.16 }}
-                className="w-full max-w-[92vw] sm:max-w-[520px] mt-4 border border-white/10 rounded-3xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 shadow-lg"
+              <div
+                className="mt-4 flex w-full max-w-[92vw] items-center gap-3 rounded-3xl border border-white/10 p-3 shadow-lg sm:max-w-[520px] sm:gap-4 sm:p-4"
                 style={{
                   backgroundColor: `rgba(0,0,0,${Math.min(cardOpacity + 0.05, 0.95)})`,
                   backdropFilter: `blur(${Math.max(8, blurStrength - 4)}px)`,
@@ -398,21 +386,13 @@ export default function ProfileClient({
                     {isPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-0.5" />}
                   </button>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
 
-      <AnimatePresence>
-        {isEntered && !previewMode && showPromoBanner && (
-          <motion.div
-            initial={{ opacity: 0, y: revealDistance }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: revealDistance }}
-            transition={contentTransition}
-            className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,480px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[rgba(8,12,22,0.76)] px-4 py-3 shadow-[0_14px_34px_rgba(0,0,0,0.38)] backdrop-blur-xl"
-          >
+      {isEntered && !previewMode && showPromoBanner && (
+        <div className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,480px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[rgba(8,12,22,0.76)] px-4 py-3 shadow-[0_14px_34px_rgba(0,0,0,0.38)] backdrop-blur-xl">
             <button
               type="button"
               onClick={() => setShowPromoBanner(false)}
@@ -428,9 +408,8 @@ export default function ProfileClient({
                 Create yours
               </Link>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
     </div>
   );
 }

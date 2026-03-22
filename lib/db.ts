@@ -257,6 +257,18 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
   return userFromPrisma(user);
 };
 
+export const userExistsByUsername = async (username: string): Promise<boolean> => {
+  const normalizedUsername = normalizeString(username);
+  if (!normalizedUsername) return false;
+
+  const user = await prisma.user.findUnique({
+    where: { username: normalizedUsername },
+    select: { username: true },
+  });
+
+  return Boolean(user);
+};
+
 export const getUserByEmail = async (email: string): Promise<User | null> => {
   const normalizedEmail = normalizeString(email).toLowerCase();
   if (!normalizedEmail) return null;

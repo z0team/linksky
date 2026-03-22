@@ -1,9 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CheckCircle2, CircleAlert, Info, X } from 'lucide-react';
-import { useLiteMode } from '@/lib/use-lite-mode';
 
 type ToastVariant = 'success' | 'error' | 'info';
 
@@ -44,12 +42,6 @@ const createToastId = () => {
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const reduceMotion = useReducedMotion();
-  const liteMode = useLiteMode(!!reduceMotion);
-  const toastTransition = liteMode
-    ? { duration: 0.01 }
-    : { duration: 0.16, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] };
-  const toastOffset = liteMode ? 0 : 6;
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
   const timersRef = useRef<Map<string, number>>(new Map());
 
@@ -77,38 +69,32 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div className="pointer-events-none fixed right-4 top-4 z-[200] flex w-[min(92vw,380px)] flex-col gap-3">
-        <AnimatePresence initial={false}>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: -toastOffset }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -toastOffset }}
-              transition={toastTransition}
-              className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl ${variantClasses[toast.variant || 'info']}`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 shrink-0">
-                  {iconMap[toast.variant || 'info']}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{toast.title}</p>
-                  {toast.description ? (
-                    <p className="mt-1 text-xs text-white/75">{toast.description}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeToast(toast.id)}
-                  className="rounded-full p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-                  aria-label="Close notification"
-                >
-                  <X size={14} />
-                </button>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl ${variantClasses[toast.variant || 'info']}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 shrink-0">
+                {iconMap[toast.variant || 'info']}
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{toast.title}</p>
+                {toast.description ? (
+                  <p className="mt-1 text-xs text-white/75">{toast.description}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="rounded-full p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="Close notification"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </ToastContext.Provider>
   );
